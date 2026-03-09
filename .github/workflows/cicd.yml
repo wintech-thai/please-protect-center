@@ -135,22 +135,22 @@ jobs:
       run: |
         export ENVIRONMENT=${{ needs.build1.outputs.autoDeployEnv }}
         export ARGOCD_BRANCH=${{ needs.build1.outputs.autoDeployBranch }}
-        export VALUE_FILE_DIR="values-files/pp-center"
-        export VALUE_FILE=${VALUE_FILE_DIR}/pp-center-03-${ARGOCD_BRANCH}-image-tag.yaml
+        export VALUE_FILE_DIR="values-files/please-protect-center"
+        export VALUE_FILE=${VALUE_FILE_DIR}/please-protect-center-03-${ARGOCD_BRANCH}-image-tag.yaml
         export IMAGE_TAG1=${{ needs.build1.outputs.imageTag }}
         git config --global user.email "cicd-auto@pp.com"
         git config --global user.name "CICD"
 
-        #git clone "https://cicd-token:${GH_TOKEN}@github.com/wintech-thai/please-protect-control-plane" deployment
-        #cd deployment
-        #git checkout ${ARGOCD_BRANCH}
+        git clone "https://cicd-token:${GH_TOKEN}@github.com/wintech-thai/onix-v2-argocd-apps" deployment
+        cd deployment
+        git checkout ${ARGOCD_BRANCH}
 
-        #cp ${VALUE_FILE_DIR}/pp-center-02-image-tag-template.yaml ${VALUE_FILE}
-        #sed -i "s#<<image-tag>>#${IMAGE_TAG1}#g" ${VALUE_FILE}
-        #ls -lrt
-        #cat ${VALUE_FILE}
+        cp ${VALUE_FILE_DIR}/please-protect-center-02-image-tag-template.yaml ${VALUE_FILE}
+        sed -i "s#<<image-tag>>#${IMAGE_TAG1}#g" ${VALUE_FILE}
+        ls -lrt
+        cat ${VALUE_FILE}
 
-        #git add ${VALUE_FILE}; git commit --m "Update image tag by auto deploy script"; git push
+        git add ${VALUE_FILE}; git commit --m "Update image tag by auto deploy script"; git push
 
     - name: Slack notification end
       if: always()
