@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation"; 
 import { 
   ChevronLeft, 
@@ -22,7 +22,7 @@ interface RoleItem {
   desc?: string; 
 }
 
-export default function CreateUserPage() {
+function CreateUserContent() {
   const router = useRouter();
   const pathname = usePathname(); 
   const searchParams = useSearchParams();
@@ -76,6 +76,7 @@ export default function CreateUserPage() {
     }
   };
 
+  // Mock Data Fetching
   useEffect(() => {
     setIsLoadingData(true);
     setTimeout(() => {
@@ -187,7 +188,6 @@ export default function CreateUserPage() {
     <div className="flex flex-col h-screen bg-[#0A0F1C] text-slate-200 font-sans">
       <Navbar />
 
-      {/* Header Section */}
       <div className="flex-none pt-8 px-6 md:px-10 mb-6">
         <div className="flex items-center gap-4">
             <button 
@@ -206,7 +206,6 @@ export default function CreateUserPage() {
       <div className="flex-1 overflow-y-auto pb-8 custom-scrollbar">
         <div className="px-6 md:px-10 space-y-6 w-full"> 
             
-            {/* User Info Box */}
             <div className="bg-[#141C2E] rounded-xl p-8 shadow-lg">
                 <div className="flex items-center gap-3 mb-8">
                     <div className="w-[5px] h-6 bg-[#0095ff] rounded-full"></div>
@@ -258,7 +257,6 @@ export default function CreateUserPage() {
                 </div>
             </div>
 
-            {/* Roles Setup Box */}
             <div className="bg-[#141C2E] rounded-xl p-8 shadow-lg">
                 <div className="flex items-center gap-3 mb-8">
                     <div className="w-[5px] h-6 bg-[#A855F7] rounded-full"></div>
@@ -288,7 +286,6 @@ export default function CreateUserPage() {
                     <h3 className="text-[14px] font-bold text-white mb-4">System Roles</h3>
                     
                     <div className="flex flex-col md:flex-row gap-4 items-center">
-                        {/* Left List */}
                         <div className="flex-1 w-full bg-[#0A0F1C] border border-[#1E293B] rounded-xl overflow-hidden flex flex-col h-[320px]">
                             <div className="px-4 py-3 bg-[#141C2E] border-b border-[#1E293B] text-[13px] font-bold text-slate-300 flex justify-between items-center">
                                 <span>Available Roles</span>
@@ -313,7 +310,6 @@ export default function CreateUserPage() {
                             </div>
                         </div>
 
-                        {/* Transfer Buttons */}
                         <div className="flex flex-row md:flex-col gap-3">
                              <button onClick={moveRight} disabled={checkedLeft.length === 0} className="p-2.5 bg-[#141C2E] hover:bg-[#0095ff] disabled:opacity-30 disabled:hover:bg-[#141C2E] rounded-lg border border-[#1E293B] text-slate-300 hover:text-white transition-all">
                                  <ChevronRight className="w-5 h-5" />
@@ -323,7 +319,6 @@ export default function CreateUserPage() {
                              </button>
                         </div>
 
-                        {/* Right List */}
                         <div className="flex-1 w-full bg-[#0A0F1C] border border-[#1E293B] rounded-xl overflow-hidden flex flex-col h-[320px]">
                             <div className="px-4 py-3 bg-[#141C2E] border-b border-[#1E293B] text-[13px] font-bold text-slate-300 flex justify-between items-center">
                                 <span>Selected Roles</span>
@@ -361,7 +356,6 @@ export default function CreateUserPage() {
         </div>
       </div>
 
-      {/* Footer Buttons */}
       <div className="flex-none px-6 py-4 border-t border-[#1E293B] bg-[#0A0F1C] flex justify-end gap-4 z-10">
             <button 
                 onClick={handleCancel} 
@@ -378,7 +372,6 @@ export default function CreateUserPage() {
             </button>
       </div>
 
-      {/* Invite Modal */}
       {showInviteModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-[2px] animate-in fade-in duration-300 px-4">
             <div className="bg-[#141C2E] border border-[#1E293B] rounded-2xl shadow-2xl w-full max-w-md p-8 transform scale-100 animate-in zoom-in-95 duration-300">
@@ -402,7 +395,6 @@ export default function CreateUserPage() {
         </div>
       )}
 
-      {/* Exit Dialog */}
       {showExitDialog && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-[2px] animate-in fade-in duration-200 px-4">
             <div className="bg-[#141C2E] border border-[#1E293B] rounded-2xl shadow-2xl w-full max-w-sm p-8 text-center">
@@ -423,5 +415,20 @@ export default function CreateUserPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function CreateUserPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col h-screen bg-[#0A0F1C]">
+        <Navbar />
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-[#0095ff]" />
+        </div>
+      </div>
+    }>
+      <CreateUserContent />
+    </Suspense>
   );
 }
