@@ -1,0 +1,358 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  LogOut,
+  Menu,
+  ChevronDown,
+  Activity,
+  Layers,
+  Globe,
+  Check,
+  User,
+  Lock,
+  Users,
+  Key,
+  FileText,
+  ShieldAlert,
+  PanelLeft,
+  Building2,
+  Search
+} from "lucide-react";
+import { useState, useMemo, useEffect, useRef } from "react";
+
+import { UpdateProfileModal } from "@/src/components/modals/update-profile-modal";
+import { ChangePasswordModal } from "@/src/components/modals/change-password-modal";
+
+// --- Mock Data สำหรับ Organization Selector ---
+const mockOrganizations = [
+  { id: "napbiotec", name: "NAP BIOTEC" },
+  { id: "chalam", name: "Chalam Farm V1" },
+  { id: "rtarf", name: "RTARF HQ" },
+];
+
+interface NavItem {
+  label: string;
+  href: string;
+  children?: { label?: string; href?: string; icon?: React.ReactNode; isDivider?: boolean }[];
+}
+
+interface NavbarProps {
+  hasSidebar?: boolean;
+  onToggleSidebar?: () => void;
+}
+
+export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
+  const pathname = usePathname();
+  const router = useRouter();
+  
+  // States สำหรับ UI
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  
+  const [username, setUsername] = useState<string | null>("Admin"); // Mock Default
+  const [language, setLanguage] = useState("EN"); // Mock Language
+
+  // States สำหรับ Custom Dropdowns
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const [isOrgOpen, setIsOrgOpen] = useState(false);
+  const [selectedOrg, setSelectedOrg] = useState(mockOrganizations[0]);
+  const [searchQuery, setSearchQuery] = useState("");
+  
+  // Refs สำหรับ Click Outside
+  const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const langDropdownRef = useRef<HTMLDivElement>(null);
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
+  const orgDropdownRef = useRef<HTMLDivElement>(null);
+
+  const filteredOrgs = mockOrganizations.filter((org) =>
+    org.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storedUsername = localStorage.getItem("username");
+      if (storedUsername) setUsername(storedUsername);
+    }
+
+    const handleClickOutside = (event: MouseEvent) => {
+      let clickedInsideMenu = false;
+      Object.values(dropdownRefs.current).forEach(ref => {
+        if (ref && ref.contains(event.target as Node)) clickedInsideMenu = true;
+      });
+      if (!clickedInsideMenu) setActiveDropdown(null);
+
+      if (langDropdownRef.current && !langDropdownRef.current.contains(event.target as Node)) setIsLangDropdownOpen(false);
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) setIsProfileDropdownOpen(false);
+      if (orgDropdownRef.current && !orgDropdownRef.current.contains(event.target as Node)) setIsOrgOpen(false);
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleLogout = async () => {
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("username");
+    localStorage.removeItem("orgId");
+    router.push("/login");
+  };
+
+  const navItems: NavItem[] = useMemo(() => [
+    { 
+      label: "Overview",
+      href: "/overview",
+      children: [
+        { label: "System Overview", href: "/overview", icon: <Layers className="w-4 h-4 mr-2" /> },
+      ]
+    },
+    {
+      label: "Administrator",
+      href: "/admin/users",
+      children: [
+        { label: "Custom Roles", href: "/admin/custom-roles", icon: <ShieldAlert className="w-4 h-4 mr-2" /> },
+        { label: "Users", href: "/admin/users", icon: <Users className="w-4 h-4 mr-2" /> },
+        { label: "API Keys", href: "/admin/api-keys", icon: <Key className="w-4 h-4 mr-2" /> },
+        { label: "Audit Logs", href: "/admin/audit-log", icon: <FileText className="w-4 h-4 mr-2" /> },
+      ]
+    }
+  ], []);
+
+  const isActive = (path: string) => {
+    if (path === "/overview") return pathname === path;
+    if (path === "/admin/users") return pathname.startsWith("/admin");
+    return pathname.startsWith(path);
+  };
+
+  const isParentActive = (item: NavItem) => {
+    if (isActive(item.href)) return true;
+    if (item.children) return item.children.some(child => child.href && pathname.startsWith(child.href));
+    return false;
+  };
+
+  return (
+    <>
+      <nav className="fixed top-0 left-0 right-0 z-50 h-16 bg-[#0B1120]/90 backdrop-blur-md border-b border-blue-900/30 shadow-lg shadow-black/40 text-blue-100">
+        <div className="container mx-auto px-4 h-full flex items-center justify-between">
+
+          {/* Logo Section */}
+          <div className="flex items-center gap-3">
+            {hasSidebar && onToggleSidebar && (
+              <button
+                onClick={onToggleSidebar}
+                className="flex md:hidden items-center justify-center w-9 h-9 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-slate-800/60 transition-colors"
+                title="Toggle sidebar"
+              >
+                <PanelLeft className="w-5 h-5" />
+              </button>
+            )}
+            
+            <Link href="/overview" className="flex items-center gap-3 group">
+              <div className="relative w-10 h-10 flex items-center justify-center bg-[#020617] rounded-lg border border-blue-900/50 p-1 group-hover:border-cyan-500/50 transition-colors">
+                <img src="/img/please-protect.svg" alt="PLEASE-PROTECT Logo" className="w-full h-full object-contain" />
+              </div>
+              <span className="text-2xl font-bold tracking-tight text-white hidden sm:block uppercase">
+                PLEASE-PROTECT <span className="text-cyan-400">CENTER</span>
+              </span>
+            </Link>
+          </div>
+
+          {/* Desktop Menu */}
+          <div className="hidden md:flex items-center gap-1 ml-6 flex-1">
+            {navItems.map((item) => {
+              if (item.children) {
+                return (
+                  <div key={item.label} className="relative" ref={(el) => { if(el) dropdownRefs.current[item.label] = el; }}>
+                    <button
+                      onClick={() => setActiveDropdown(activeDropdown === item.label ? null : item.label)}
+                      className={`flex items-center gap-1 px-4 py-2 text-base font-medium transition-all duration-200 rounded-md outline-none ${isParentActive(item) ? "text-cyan-400 bg-blue-500/10 shadow-[0_0_10px_rgba(6,182,212,0.1)]" : "text-slate-400 hover:text-blue-200 hover:bg-blue-900/20"}`}
+                    >
+                      {item.label}
+                      <ChevronDown className={`w-4 h-4 mt-0.5 opacity-70 transition-transform ${activeDropdown === item.label ? "rotate-180" : ""}`} />
+                    </button>
+
+                    {activeDropdown === item.label && (
+                      <div className="absolute left-0 top-full mt-2 min-w-[220px] p-1 bg-[#0B1120] border border-blue-900/30 shadow-xl shadow-black/50 rounded-lg animate-in fade-in slide-in-from-top-2">
+                        {item.children.map((subItem, idx) => {
+                          if (subItem.isDivider) return <div key={`div-${idx}`} className="h-[1px] bg-slate-800 my-2 mx-3" />;
+                          return (
+                            <Link
+                              key={subItem.label || idx}
+                              href={subItem.href!}
+                              onClick={() => setActiveDropdown(null)}
+                              className={`flex items-center px-3 py-3 text-base rounded-md transition-colors w-full ${pathname === subItem.href ? "bg-blue-500/20 text-cyan-400 font-medium" : "text-slate-400 hover:bg-blue-900/30 hover:text-blue-200"}`}
+                            >
+                              {subItem.icon}
+                              {subItem.label}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              return (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className={`flex items-center gap-1 px-4 py-2 text-base font-medium transition-all duration-200 rounded-md ${isActive(item.href) ? "text-cyan-400 bg-blue-500/10 shadow-[0_0_10px_rgba(6,182,212,0.1)]" : "text-slate-400 hover:text-blue-200 hover:bg-blue-900/20"}`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Right Actions */}
+          <div className="flex items-center gap-3">
+            
+            {/* Organization Selector */}
+            <div className="relative hidden lg:block" ref={orgDropdownRef}>
+              <button
+                onClick={() => setIsOrgOpen(!isOrgOpen)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-[#162032]/80 border border-blue-900/50 rounded-lg hover:border-cyan-500/50 transition-colors group"
+              >
+                <Building2 className="w-4 h-4 text-cyan-500" />
+                <span className="font-semibold text-white text-sm max-w-[120px] truncate">{selectedOrg.name}</span>
+                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isOrgOpen ? "rotate-180" : ""}`} />
+              </button>
+
+              {isOrgOpen && (
+                <div className="absolute right-0 top-full mt-2 w-64 bg-[#0B1120] border border-blue-900/50 rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2">
+                  <div className="p-2 border-b border-blue-900/30">
+                    <div className="relative">
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                      <input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#162032] border border-blue-900/50 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500" />
+                    </div>
+                  </div>
+                  <div className="max-h-60 overflow-y-auto p-1 custom-scrollbar">
+                    {filteredOrgs.map((org) => (
+                      <button key={org.id} onClick={() => { setSelectedOrg(org); setIsOrgOpen(false); setSearchQuery(""); }} className={`w-full text-left px-3 py-2.5 rounded-lg text-sm mb-1 flex justify-between items-center transition-colors ${selectedOrg.id === org.id ? "bg-blue-600/20 text-cyan-400 font-semibold" : "text-slate-300 hover:bg-[#162032]"}`}>
+                        {org.name}
+                        {selectedOrg.id === org.id && <Check className="w-4 h-4 text-cyan-400" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="hidden lg:block w-px h-6 bg-blue-900/50 mx-1"></div>
+
+            {/* Language Switcher */}
+            <div className="relative hidden sm:block" ref={langDropdownRef}>
+              <button onClick={() => setIsLangDropdownOpen(!isLangDropdownOpen)} className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium border border-blue-900/30 rounded-full text-slate-400 hover:text-cyan-400 hover:border-cyan-500/50 hover:bg-blue-900/20 transition-all duration-200">
+                <Globe className="w-3.5 h-3.5" />
+                <span>{language}</span>
+                <ChevronDown className={`w-3 h-3 opacity-50 transition-transform ${isLangDropdownOpen ? "rotate-180" : ""}`} />
+              </button>
+              
+              {isLangDropdownOpen && (
+                <div className="absolute right-0 top-full mt-2 w-[150px] p-1 bg-[#0B1120] border border-blue-900/30 shadow-xl rounded-lg text-blue-100 animate-in fade-in slide-in-from-top-2">
+                  <button onClick={() => { setLanguage("EN"); setIsLangDropdownOpen(false); }} className={`w-full flex items-center justify-between px-3 py-2 rounded-md transition-colors text-sm ${language === "EN" ? "bg-blue-500/20 text-cyan-400" : "hover:bg-blue-900/30 text-slate-400"}`}>
+                    <div className="flex gap-2"><span>🇬🇧</span> English</div>{language === "EN" && <Check className="w-3.5 h-3.5" />}
+                  </button>
+                  <button onClick={() => { setLanguage("TH"); setIsLangDropdownOpen(false); }} className={`w-full flex items-center justify-between px-3 py-2 rounded-md transition-colors text-sm mt-1 ${language === "TH" ? "bg-blue-500/20 text-cyan-400" : "hover:bg-blue-900/30 text-slate-400"}`}>
+                    <div className="flex gap-2"><span>🇹🇭</span> ภาษาไทย</div>{language === "TH" && <Check className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* User Profile Dropdown */}
+            <div className="relative hidden sm:block" ref={profileDropdownRef}>
+              <button onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)} className="flex items-center justify-center outline-none group" title={username || "User"}>
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-900 to-slate-800 border border-blue-700/50 flex items-center justify-center shadow-[0_0_10px_rgba(59,130,246,0.15)] group-hover:border-cyan-500/50 transition-all duration-300">
+                      <User className="w-5 h-5 text-blue-200 group-hover:text-cyan-400 transition-colors" />
+                  </div>
+              </button>
+
+              {isProfileDropdownOpen && (
+                <div className="absolute right-0 top-full mt-2 w-[200px] p-1 bg-[#0B1120] border border-blue-900/30 shadow-2xl rounded-lg text-blue-100 animate-in fade-in slide-in-from-top-2">
+                    <button onClick={() => { setShowProfileModal(true); setIsProfileDropdownOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-sm rounded-md text-slate-300 hover:bg-blue-900/40 hover:text-cyan-400 transition-colors">
+                        <User className="w-4 h-4" /> <span>Profile</span>
+                    </button>
+                    <button onClick={() => { setShowPasswordModal(true); setIsProfileDropdownOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-sm rounded-md text-slate-300 hover:bg-blue-900/40 hover:text-cyan-400 transition-colors">
+                        <Lock className="w-4 h-4" /> <span>Change Password</span>
+                    </button>
+                    <button onClick={handleLogout} className="w-full flex items-center gap-2 px-3 py-2.5 text-sm rounded-md text-red-400 hover:bg-red-900/20 hover:text-red-300 transition-colors border-t border-blue-900/30 mt-1">
+                        <LogOut className="w-4 h-4" /> <span>Logout</span>
+                    </button>
+                </div>
+              )}
+            </div>
+
+            {/* Mobile Menu Button */}
+            <button className="md:hidden text-slate-300 hover:text-white p-1" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+              <Menu className="w-7 h-7" />
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Menu */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden absolute top-16 left-0 w-full bg-[#0B1120] border-b border-blue-900/30 shadow-lg max-h-[80vh] overflow-y-auto z-40 animate-in slide-in-from-top-2 text-blue-100">
+            {navItems.map((item) => (
+              <div key={item.label}>
+                <Link href={item.href} className="block px-4 py-4 text-base font-medium text-slate-300 border-b border-blue-900/30 hover:bg-blue-900/20 hover:text-cyan-400" onClick={(e) => { if (item.href === "#") e.preventDefault(); if (!item.children && item.href !== "#") setIsMobileMenuOpen(false); }}>
+                  {item.label}
+                </Link>
+                {item.children && (
+                  <div className="bg-[#020617]/50 pl-4 border-b border-blue-900/30">
+                    {item.children.map((subItem, idx) => {
+                      if (subItem.isDivider) return <div key={`mob-div-${idx}`} className="h-[1px] bg-slate-800/80 my-3 mx-4" />;
+                      return (
+                        <Link key={subItem.label || idx} href={subItem.href!} className="flex items-center gap-2 px-4 py-3 text-base text-slate-400 hover:text-cyan-400" onClick={(e) => { if (subItem.href === "#") e.preventDefault(); else setIsMobileMenuOpen(false); }}>
+                          {subItem.icon} {subItem.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            <div className="border-b border-blue-900/30">
+              <button onClick={() => { setShowProfileModal(true); setIsMobileMenuOpen(false); }} className="flex w-full items-center gap-3 px-4 py-4 text-base text-slate-400 hover:text-cyan-400 hover:bg-blue-900/10 outline-none"><User className="w-5 h-5" /> Profile</button>
+              <button onClick={() => { setShowPasswordModal(true); setIsMobileMenuOpen(false); }} className="flex w-full items-center gap-3 px-4 py-4 text-base text-slate-400 hover:text-cyan-400 hover:bg-blue-900/10 outline-none"><Lock className="w-5 h-5" /> Change Password</button>
+              <button onClick={handleLogout} className="flex w-full items-center gap-3 px-4 py-4 text-base text-red-400 hover:text-red-300 hover:bg-red-900/10 outline-none"><LogOut className="w-5 h-5" /> Logout</button>
+            </div>
+
+            <div className="p-4 bg-[#020617]/50">
+              <p className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider">Language</p>
+              <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => setLanguage("EN")} className={`flex justify-center gap-2 py-3 text-sm font-medium rounded-md border ${language === "EN" ? "bg-[#0B1120] border-cyan-500 text-cyan-400" : "bg-[#0B1120] border-blue-900/30 text-slate-400"}`}>🇬🇧 English</button>
+                  <button onClick={() => setLanguage("TH")} className={`flex justify-center gap-2 py-3 text-sm font-medium rounded-md border ${language === "TH" ? "bg-[#0B1120] border-cyan-500 text-cyan-400" : "bg-[#0B1120] border-blue-900/30 text-slate-400"}`}>🇹🇭 ไทย</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </nav>
+
+      <UpdateProfileModal 
+        isOpen={showProfileModal} 
+        onClose={() => setShowProfileModal(false)} 
+      />
+
+      <ChangePasswordModal 
+        isOpen={showPasswordModal} 
+        onClose={() => setShowPasswordModal(false)} 
+      />
+
+      <div className="h-16 w-full shrink-0"></div>
+      
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #334155; }
+      `}</style>
+    </>
+  );
+}
