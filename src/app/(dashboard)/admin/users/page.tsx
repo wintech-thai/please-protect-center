@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, usePathname } from "next/navigation";
 import { 
@@ -12,7 +12,8 @@ import {
   X,
   MoreHorizontal,
   Trash2,
-  Copy 
+  Copy,
+  Loader2
 } from "lucide-react";
 import { Navbar } from "@/src/components/layout/navbar"; 
 
@@ -25,7 +26,7 @@ const MOCK_USERS = [
   { orgUserId: "u5", userName: "root_system", userEmail: "root@localhost", rolesList: "Super Admin", userStatus: "Active", isOrgInitialUser: "YES", tags: "System", customRoleName: "Root" },
 ];
 
-export default function UsersPage() {
+function UsersContent() {
   const pathname = usePathname(); 
   const searchParams = useSearchParams();
   const highlightIdParam = searchParams.get("highlight");
@@ -288,7 +289,7 @@ export default function UsersPage() {
                   </table>
               </div>
               
-              <div className="flex-none flex items-center justify-between sm:justify-end px-4 py-3 border-t border-blue-900/50 bg-[#020617] z-20 gap-4 sm:gap-6">
+              <div className="flex-none flex items-center justify-between sm:justify-end px-6 py-4 border-t border-blue-900/50 bg-[#020617] z-20 gap-4 sm:gap-6">
                   <div className="flex items-center gap-2 text-sm text-slate-400">
                       <span>Rows per page</span>
                       <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setPage(1); }} className="bg-transparent border-none text-slate-200 focus:ring-0 cursor-pointer font-medium outline-none">
@@ -372,13 +373,21 @@ export default function UsersPage() {
             </div>
         </div>
       )}
-
-      <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e3a8a; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #2563eb; }
-      `}</style>
     </div>
+  );
+}
+
+export default function UsersPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col h-screen bg-[#020617]">
+        <Navbar />
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
+        </div>
+      </div>
+    }>
+      <UsersContent />
+    </Suspense>
   );
 }

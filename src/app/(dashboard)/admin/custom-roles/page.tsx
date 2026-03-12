@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, usePathname } from "next/navigation";
 import { 
@@ -12,7 +12,8 @@ import {
   X,
   MoreHorizontal,
   Trash2,
-  ShieldCheck
+  ShieldCheck,
+  Loader2
 } from "lucide-react";
 import { Navbar } from "@/src/components/layout/navbar"; 
 
@@ -25,7 +26,7 @@ const MOCK_ROLES = [
   { id: "r5", roleName: "Operator", description: "Manage basic sensor configurations and status.", tags: "System", status: "Active" },
 ];
 
-export default function CustomRolesPage() {
+function CustomRolesContent() {
   const pathname = usePathname(); 
   const searchParams = useSearchParams();
   const highlightIdParam = searchParams.get("highlight");
@@ -153,7 +154,7 @@ export default function CustomRolesPage() {
           </div>
         </div>
 
-        {/* Table Area - ชิดซ้ายขวาด้านล่าง */}
+        {/* Table Area */}
         <div className="flex-1 overflow-hidden flex flex-col min-h-0">
           <div className="flex-1 bg-[#0B1120] border-t border-blue-900/30 overflow-hidden flex flex-col shadow-2xl">
               <div className="flex-1 overflow-auto custom-scrollbar">
@@ -235,7 +236,7 @@ export default function CustomRolesPage() {
                       </select>
                   </div>
                   <div className="flex items-center gap-4">
-                      <div className="text-xs text-slate-400">{totalCount === 0 ? '0-0' : `${startRow}-${endRow}`} 0f {totalCount}</div>
+                      <div className="text-xs text-slate-400">{totalCount === 0 ? '0-0' : `${startRow}-${endRow}`} of {totalCount}</div>
                       <div className="flex items-center gap-1">
                           <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded hover:bg-blue-900/40 text-slate-400 disabled:opacity-30 transition-colors"><ChevronLeft className="w-5 h-5" /></button>
                           <button onClick={() => setPage(p => Math.min(Math.ceil(totalCount/itemsPerPage), p + 1))} disabled={page >= Math.ceil(totalCount/itemsPerPage) || totalCount === 0} className="p-1.5 rounded hover:bg-blue-900/40 text-slate-400 disabled:opacity-30 transition-colors"><ChevronRight className="w-5 h-5" /></button>
@@ -246,12 +247,35 @@ export default function CustomRolesPage() {
         </div>
       </main>
 
-      <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e3a8a; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #2563eb; }
-      `}</style>
+      {/* Delete/Revoke Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-[#0B1120] border border-blue-900/50 rounded-xl shadow-2xl w-full max-w-sm p-6 text-center">
+                <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/20 text-red-500"><Trash2 className="w-6 h-6" /></div>
+                <h3 className="text-lg font-bold text-white mb-2 uppercase">Delete Role</h3>
+                <p className="text-sm text-slate-400 mb-6 font-medium leading-relaxed px-2">Are you sure you want to delete {selectedIds.length} role(s)? This action cannot be undone.</p>
+                <div className="flex gap-3">
+                    <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-800 rounded-lg transition-colors border border-slate-700">Cancel</button>
+                    <button onClick={handleBulkDelete} className="flex-1 py-2.5 text-sm font-medium bg-red-600 hover:bg-red-500 text-white rounded-lg transition-all shadow-lg shadow-red-900/20 font-bold uppercase">Delete Now</button>
+                </div>
+            </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+export default function CustomRolesPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col h-screen bg-[#020617]">
+        <Navbar />
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
+        </div>
+      </div>
+    }>
+      <CustomRolesContent />
+    </Suspense>
   );
 }

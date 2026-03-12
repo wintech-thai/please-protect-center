@@ -166,7 +166,6 @@ export default function CreateUserPage() {
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  // ✅ ฟังก์ชันที่หายไป เพิ่มกลับมาแล้วครับ!
   const handleFinish = () => {
     setShowInviteModal(false);
     if (createdUserId) router.push(`/admin/users?highlight=${createdUserId}`);
@@ -188,7 +187,7 @@ export default function CreateUserPage() {
     <div className="flex flex-col h-screen bg-[#0A0F1C] text-slate-200 font-sans">
       <Navbar />
 
-      {/* 🟢 Header Section */}
+      {/* Header Section */}
       <div className="flex-none pt-8 px-6 md:px-10 mb-6">
         <div className="flex items-center gap-4">
             <button 
@@ -204,11 +203,10 @@ export default function CreateUserPage() {
         </div>
       </div>
 
-      {/* 🟢 Main Form Area (ไม่มี max-w แล้ว ยืดเต็มแน่นอน) */}
       <div className="flex-1 overflow-y-auto pb-8 custom-scrollbar">
         <div className="px-6 md:px-10 space-y-6 w-full"> 
             
-            {/* 🟦 User Info Box */}
+            {/* User Info Box */}
             <div className="bg-[#141C2E] rounded-xl p-8 shadow-lg">
                 <div className="flex items-center gap-3 mb-8">
                     <div className="w-[5px] h-6 bg-[#0095ff] rounded-full"></div>
@@ -260,7 +258,7 @@ export default function CreateUserPage() {
                 </div>
             </div>
 
-            {/* 🟪 Roles Setup Box */}
+            {/* Roles Setup Box */}
             <div className="bg-[#141C2E] rounded-xl p-8 shadow-lg">
                 <div className="flex items-center gap-3 mb-8">
                     <div className="w-[5px] h-6 bg-[#A855F7] rounded-full"></div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, usePathname } from "next/navigation";
 import { 
@@ -26,7 +26,7 @@ const MOCK_API_KEYS = [
   { id: "k5", keyName: "External-Scanner-API", description: "Third-party scanner integration key.", customRole: "Operator", roles: "Editor", status: "Pending" },
 ];
 
-export default function ApiKeysPage() {
+function ApiKeysContent() {
   const pathname = usePathname(); 
   const searchParams = useSearchParams();
   const highlightIdParam = searchParams.get("highlight");
@@ -262,13 +262,18 @@ export default function ApiKeysPage() {
             </div>
         </div>
       )}
-
-      <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e3a8a; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #2563eb; }
-      `}</style>
     </div>
+  );
+}
+
+export default function ApiKeysPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-screen bg-[#020617]">
+        <div className="text-cyan-500 animate-pulse font-bold tracking-widest">LOADING...</div>
+      </div>
+    }>
+      <ApiKeysContent />
+    </Suspense>
   );
 }
