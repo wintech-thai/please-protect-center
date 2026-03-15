@@ -1,18 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter, useSearchParams, usePathname } from "next/navigation"; 
+import { useEffect, useState } from "react";
+import { useRouter, useParams } from "next/navigation";
 import { 
   ChevronLeft, 
   X, 
   ChevronRight, 
   ChevronLeft as ChevronLeftIcon,
   ChevronDown,
-  AlertTriangle,
   Loader2,
-  Check,
-  Copy,
-  UserPlus
+  AlertTriangle
 } from "lucide-react";
 import { Navbar } from "@/src/components/layout/navbar";
 
@@ -22,12 +19,38 @@ interface RoleItem {
   desc?: string; 
 }
 
-export default function CreateUserPage() {
+// --- Mock Data ---
+const MOCK_SYSTEM_ROLES = [
+  { id: "sr1", name: "Super Admin", desc: "Full system access, manage all modules and users." },
+  { id: "sr2", name: "Security Analyst", desc: "Monitor security events and manage threat detection." },
+  { id: "sr3", name: "Threat Hunter", desc: "Search for cyber threats and investigate incidents." },
+  { id: "sr4", name: "Viewer", desc: "Read-only access to dashboards and reports." },
+  { id: "sr5", name: "Editor", desc: "Can edit configurations but cannot manage users." },
+];
+
+const MOCK_CUSTOM_ROLES = [
+  { id: "cr1", name: "System Administrator", desc: "IT admin full access" },
+  { id: "cr2", name: "SOC Analyst Level 1", desc: "Basic monitoring" },
+  { id: "cr3", name: "Guest Viewer", desc: "External viewer" },
+];
+
+const MOCK_USER_DATA = {
+  orgUserId: "u1",
+  userName: "admin_super",
+  userEmail: "admin@rtarf.mi.th",
+  tags: "IT,HQ,Admin",
+  customRoleId: "cr1",
+  roles: ["Super Admin", "Editor"]
+};
+
+export default function UpdateUserPage() {
   const router = useRouter();
-  const pathname = usePathname(); 
-  const searchParams = useSearchParams();
-  
-  const [returnToId, setReturnToId] = useState<string | null>(null);
+  const params = useParams();
+  const userId = params?.id as string;
+
+  // --- Loading States ---
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // --- Form State ---
   const [formData, setFormData] = useState({
@@ -38,61 +61,68 @@ export default function CreateUserPage() {
   });
 
   const [tagInput, setTagInput] = useState("");
-  
-  // --- Roles State (Mock Data) ---
-  const [customRolesList, setCustomRolesList] = useState<RoleItem[]>([]);
-  const [isLoadingData, setIsLoadingData] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [leftRoles, setLeftRoles] = useState<RoleItem[]>([]);
-  const [rightRoles, setRightRoles] = useState<RoleItem[]>([]);
+  // --- Roles State ---
+  const [customRolesList, setCustomRolesList] = useState<RoleItem[]>([]);
+  
+  // --- Transfer List State ---
+  const [leftRoles, setLeftRoles] = useState<RoleItem[]>([]);  
+  const [rightRoles, setRightRoles] = useState<RoleItem[]>([]); 
   const [checkedLeft, setCheckedLeft] = useState<string[]>([]);
   const [checkedRight, setCheckedRight] = useState<string[]>([]);
   
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [showExitDialog, setShowExitDialog] = useState(false);
 
-  // --- Invite Modal State ---
-  const [showInviteModal, setShowInviteModal] = useState(false);
-  const [inviteLink, setInviteLink] = useState("");
-  const [isCopied, setIsCopied] = useState(false);
-  const [createdUserId, setCreatedUserId] = useState<string | null>(null);
-
+  // --- Fetch Mock Data ---
   useEffect(() => {
-    const prevHighlight = searchParams.get("prevHighlight");
-    if (prevHighlight) {
-        setReturnToId(prevHighlight);
-        const params = new URLSearchParams(searchParams.toString());
-        params.delete("prevHighlight");
-        window.history.replaceState(null, '', `${pathname}?${params.toString()}`);
-    }
-  }, [searchParams, pathname]);
+    const initData = async () => {
+      if (!userId) return;
+      try {
+        setIsLoadingData(true);
+        await new Promise(resolve => setTimeout(resolve, 600));
 
-  const goBack = () => {
-    if (returnToId) {
-        router.push(`/admin/users?highlight=${returnToId}`);
-    } else {
-        router.back();
-    }
+        setCustomRolesList(MOCK_CUSTOM_ROLES);
+
+        setFormData({
+            username: MOCK_USER_DATA.userName,
+            email: MOCK_USER_DATA.userEmail, 
+            tags: MOCK_USER_DATA.tags.split(',').filter(t => t.trim() !== ""),
+            customRole: MOCK_USER_DATA.customRoleId
+        });
+
+        const selectedRoles = MOCK_SYSTEM_ROLES.filter(r => MOCK_USER_DATA.roles.includes(r.name));
+        const availableRoles = MOCK_SYSTEM_ROLES.filter(r => !MOCK_USER_DATA.roles.includes(r.name));
+
+        setRightRoles(selectedRoles);
+        setLeftRoles(availableRoles);
+
+      } catch (error) {
+        console.error("Failed to load user data:", error);
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+
+    initData();
+  }, [userId]);
+
+  // --- Helper: Check Dirty State ---
+  const checkIsDirty = () => {
+    const originalTags = MOCK_USER_DATA.tags.split(',').filter(t => t.trim() !== "").sort().join(',');
+    const currentTags = formData.tags.slice().sort().join(',');
+    if (originalTags !== currentTags) return true;
+    if (tagInput.trim() !== "") return true;
+
+    if (formData.customRole !== MOCK_USER_DATA.customRoleId) return true;
+
+    const originalRoleIdsStr = MOCK_USER_DATA.roles.slice().sort().join(',');
+    const currentRoleIdsStr = rightRoles.map(r => r.name).slice().sort().join(',');
+    
+    if (originalRoleIdsStr !== currentRoleIdsStr) return true;
+
+    return false;
   };
-
-  useEffect(() => {
-    setIsLoadingData(true);
-    setTimeout(() => {
-      setLeftRoles([
-        { id: "sr1", name: "Super Admin", desc: "Full system access, manage all modules and users." },
-        { id: "sr2", name: "Security Analyst", desc: "Monitor security events and manage threat detection." },
-        { id: "sr3", name: "Threat Hunter", desc: "Search for cyber threats and investigate incidents." },
-        { id: "sr4", name: "Viewer", desc: "Read-only access to dashboards and reports." },
-      ]);
-      setCustomRolesList([
-        { id: "cr1", name: "System Administrator" },
-        { id: "cr2", name: "SOC Analyst Level 1" },
-        { id: "cr3", name: "Guest Viewer" },
-      ]);
-      setIsLoadingData(false);
-    }, 600);
-  }, []);
 
   const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && tagInput.trim()) {
@@ -131,50 +161,38 @@ export default function CreateUserPage() {
   };
 
   const handleCancel = () => {
-    const isDirty = formData.username.trim() !== "" || formData.email.trim() !== "" || formData.tags.length > 0 || formData.customRole !== "" || rightRoles.length > 0 || tagInput.trim() !== "";
-    if (isDirty) setShowExitDialog(true);
-    else goBack(); 
+     if (checkIsDirty()) {
+       setShowExitDialog(true);
+     } else {
+       router.push(`/admin/users?highlight=${userId}`);
+     }
   };
 
-  // Mock Submit Form 
   const handleSubmit = async () => {
     let finalTags = [...formData.tags];
     const pendingTag = tagInput.trim();
-    if (pendingTag && !finalTags.includes(pendingTag)) finalTags.push(pendingTag);
+    if (pendingTag && !finalTags.includes(pendingTag)) {
+        finalTags.push(pendingTag);
+    }
 
     const newErrors: { [key: string]: string } = {};
-    if (!formData.username) newErrors.username = "Username is required";
-    if (!formData.email) newErrors.email = "Email is required";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = "Invalid email format";
     if (finalTags.length === 0) newErrors.tags = "At least one tag is required";
-    
     setErrors(newErrors);
 
-    if (Object.keys(newErrors).length === 0) {
-      setIsSubmitting(true);
-      setTimeout(() => {
-        setIsSubmitting(false);
-        setCreatedUserId(`mock-user-${Math.floor(Math.random() * 1000)}`);
-        
-        const token = Math.random().toString(36).substring(2, 15);
-        const domain = typeof window !== "undefined" ? window.location.host : "protect.center";
-        setInviteLink(`https://${domain}/register?token=${token}`);
-        
-        setShowInviteModal(true);
-      }, 1000);
+    if (Object.keys(newErrors).length > 0) return;
+
+    if (!checkIsDirty()) {
+        router.push(`/admin/users?highlight=${userId}`);
+        return;
     }
-  };
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(inviteLink);
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2000);
-  };
-
-  const handleFinish = () => {
-    setShowInviteModal(false);
-    if (createdUserId) router.push(`/admin/users?highlight=${createdUserId}`);
-    else goBack();
+    setIsSubmitting(true);
+    
+    setTimeout(() => {
+        setIsSubmitting(false);
+        alert("User Updated Successfully (Mock)");
+        router.push(`/admin/users?highlight=${userId}`);
+    }, 1000);
   };
 
   if (isLoadingData) {
@@ -205,46 +223,52 @@ export default function CreateUserPage() {
                 <ChevronLeft className="w-5 h-5" />
             </button>
             <div>
-                <h1 className="text-2xl font-bold text-white tracking-tight">Create User</h1>
-                <p className="text-slate-400 text-sm mt-0.5">Add a new user to the organization</p>
+                <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                    Update User
+                    <span className="text-xs font-normal text-slate-500 px-2 py-0.5 rounded-full border border-slate-800 bg-slate-900 font-mono">
+                      {formData.username}
+                    </span>
+                </h1>
+                <p className="text-slate-400 text-sm mt-0.5">Modify user roles and permissions</p>
             </div>
         </div>
       </div>
 
-      {/* Main Form Area */}
+      {/* Main Content */}
       <div className="flex-1 overflow-y-auto pb-8 custom-scrollbar">
         <div className="px-4 md:px-8 space-y-6 w-full"> 
             
-            {/* User Info Box */}
+            {/* 1. User Information Section */}
             <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 shadow-sm">
                 <h2 className="text-base font-semibold text-white mb-6 flex items-center gap-2 border-b border-slate-800 pb-3">
                     <span className="w-1 h-5 bg-blue-500 rounded-full"></span>
                     User Information
                 </h2>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Username - Disabled */}
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-300">Username <span className="text-red-400">*</span></label>
+                        <label className="text-sm font-medium text-slate-400">
+                            Username <span className="text-red-400">*</span>
+                        </label>
                         <input 
                             type="text" 
-                            placeholder="e.g. johndoe"
                             value={formData.username}
-                            onChange={e => setFormData({...formData, username: e.target.value})}
-                            className={`w-full bg-slate-950 border ${errors.username ? 'border-red-500/50 focus:border-red-500' : 'border-slate-700 focus:border-blue-500'} rounded-lg px-4 py-2.5 text-slate-200 outline-none transition-all placeholder:text-slate-600 text-sm`}
+                            disabled 
+                            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-500 outline-none cursor-default opacity-75 text-sm font-mono"
                         />
-                        {errors.username && <p className="text-red-400 text-xs">{errors.username}</p>}
                     </div>
 
+                    {/* Email - Disabled */}
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-300">Email <span className="text-red-400">*</span></label>
+                        <label className="text-sm font-medium text-slate-400">
+                            Email <span className="text-red-400">*</span>
+                        </label>
                         <input 
                             type="text" 
-                            placeholder="name@example.com"
                             value={formData.email}
-                            onChange={e => setFormData({...formData, email: e.target.value})}
-                            className={`w-full bg-slate-950 border ${errors.email ? 'border-red-500/50 focus:border-red-500' : 'border-slate-700 focus:border-blue-500'} rounded-lg px-4 py-2.5 text-slate-200 outline-none transition-all placeholder:text-slate-600 text-sm`}
+                            disabled 
+                            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-500 outline-none cursor-default opacity-75 text-sm font-mono"
                         />
-                          {errors.email && <p className="text-red-400 text-xs">{errors.email}</p>}
                     </div>
                 </div>
                 
@@ -267,7 +291,7 @@ export default function CreateUserPage() {
                 </div>
             </div>
 
-            {/* Roles Setup Box */}
+            {/* 2. Roles & Permissions Section */}
             <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 shadow-sm">
                 <h2 className="text-base font-semibold text-white mb-6 flex items-center gap-2 border-b border-slate-800 pb-3">
                     <span className="w-1 h-5 bg-purple-500 rounded-full"></span>
@@ -293,11 +317,12 @@ export default function CreateUserPage() {
                     </div>
                 </div>
 
+                {/* System Roles Transfer List */}
                 <div>
                     <h3 className="text-sm font-medium text-slate-300 mb-3">System Roles Assignment</h3>
-                    
                     <div className="flex flex-col md:flex-row gap-4 items-center">
-                        {/* Left List */}
+                        
+                        {/* Available Roles (Left) */}
                         <div className="flex-1 w-full bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex flex-col h-[320px]">
                             <div className="px-4 py-3 bg-slate-900/80 border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider flex justify-between items-center">
                                 <span>Available Roles</span>
@@ -326,7 +351,7 @@ export default function CreateUserPage() {
                             </div>
                         </div>
 
-                        {/* Transfer Buttons */}
+                        {/* Middle Transfer Buttons */}
                         <div className="flex flex-row md:flex-col gap-3 relative z-10">
                              <button onClick={moveRight} disabled={checkedLeft.length === 0} className="p-2.5 bg-slate-800 hover:bg-blue-600 disabled:opacity-30 disabled:hover:bg-slate-800 rounded-full border border-slate-700 text-slate-300 hover:text-white transition-all shadow-lg">
                                  <ChevronRight className="w-5 h-5" />
@@ -336,7 +361,7 @@ export default function CreateUserPage() {
                              </button>
                         </div>
 
-                        {/* Right List */}
+                        {/* Selected Roles (Right) */}
                         <div className="flex-1 w-full bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex flex-col h-[320px]">
                             <div className="px-4 py-3 bg-slate-900/80 border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider flex justify-between items-center">
                                 <span>Selected Roles</span>
@@ -376,10 +401,7 @@ export default function CreateUserPage() {
 
       {/* Footer Buttons */}
       <div className="flex-none p-4 md:px-8 border-t border-slate-800 bg-slate-950 flex justify-end gap-3 z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-            <button 
-                onClick={handleCancel} 
-                className="px-6 py-2.5 rounded-lg border border-red-500/50 text-red-500 hover:bg-red-500/10 transition-all font-medium text-sm"
-            >
+            <button onClick={handleCancel} className="px-6 py-2.5 rounded-lg border border-red-500/50 text-red-500 hover:bg-red-500/10 transition-all font-medium text-sm">
                 Cancel
             </button>
             <button 
@@ -391,39 +413,22 @@ export default function CreateUserPage() {
             </button>
       </div>
 
-      {/* Invite Modal */}
-      {showInviteModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-300 px-4">
-            <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md p-6 transform scale-100 animate-in zoom-in-95 duration-300">
-                <div className="flex flex-col items-center text-center">
-                    <div className="w-14 h-14 bg-green-500/10 rounded-full flex items-center justify-center mb-4 border border-green-500/20"><UserPlus className="w-7 h-7 text-green-400" /></div>
-                    <h3 className="text-xl font-bold text-white mb-1">User Created!</h3>
-                    <p className="text-sm text-slate-400 mb-6 px-4 leading-relaxed">Copy the registration link below and send it to the user to complete their setup.</p>
-                    
-                    <div className="w-full bg-slate-950 border border-slate-800 rounded-lg p-1.5 flex items-center gap-2 mb-6 shadow-inner">
-                        <div className="flex-1 bg-transparent px-3 text-sm text-slate-300 truncate font-mono select-all text-left">{inviteLink}</div>
-                        <button onClick={handleCopyLink} className={`p-2 rounded-md transition-all duration-200 ${isCopied ? "bg-green-500 text-white shadow-lg" : "bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700"}`}>
-                            {isCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                        </button>
-                    </div>
-                    <button onClick={handleFinish} className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium shadow-lg shadow-blue-500/20 transition-all">
-                        Done
-                    </button>
-                </div>
-            </div>
-        </div>
-      )}
-
       {/* Exit Dialog */}
       {showExitDialog && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200 px-4">
             <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-sm p-6 text-center">
-                <div className="w-14 h-14 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4 border border-red-500/20"><AlertTriangle className="w-8 h-8 text-red-500" /></div>
-                <h3 className="text-lg font-bold text-white">Discard User?</h3>
-                <p className="text-sm text-slate-400 mt-2 mb-6">You have unsaved information. Are you sure you want to leave?</p>
+                <div className="w-14 h-14 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4 border border-red-500/20">
+                  <AlertTriangle className="w-8 h-8 text-red-500" />
+                </div>
+                <h3 className="text-lg font-bold text-white mb-2">Discard Changes?</h3>
+                <p className="text-sm text-slate-400 mb-6">You have unsaved information. Are you sure you want to leave?</p>
                 <div className="flex justify-end gap-3 w-full">
-                    <button onClick={() => setShowExitDialog(false)} className="flex-1 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 rounded-lg transition-colors">Stay</button>
-                    <button onClick={() => goBack()} className="flex-1 px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-500 text-white rounded-lg shadow-lg transition-all">Discard</button>
+                    <button onClick={() => setShowExitDialog(false)} className="flex-1 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 rounded-lg transition-colors border border-slate-700">
+                        Stay
+                    </button>
+                    <button onClick={() => router.push(`/admin/users?highlight=${userId}`)} className="flex-1 px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-500 text-white rounded-lg shadow-lg transition-all">
+                        Discard
+                    </button>
                 </div>
             </div>
         </div>

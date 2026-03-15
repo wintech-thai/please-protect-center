@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { loginSchema, LoginSchemaType } from "../schema/login.schema";
+import { authApi } from "@/src/modules/auth/api/auth.api";
 
 // --- Icons Components ---
 const LockIcon = ({ className }: { className?: string }) => (
@@ -24,7 +25,7 @@ const UserIcon = ({ className }: { className?: string }) => (
 );
 
 export default function SignInView() {
-  const router = useRouter();
+  const router = useRouter(); 
   const systemName = "PLEASE-PROTECT";
 
   const {
@@ -41,23 +42,73 @@ export default function SignInView() {
 
   const onSubmit = async (data: LoginSchemaType) => {
     try {
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      localStorage.removeItem("username");
+      localStorage.removeItem("orgId");
 
-      if (data.username === "admin" && data.password === "12345") {
-        toast.success("Login successful (Mock)", {
-          duration: 2000,
-        });
+      const result = await authApi.signIn(data);
+      const token = result?.token?.access_token;
+
+      if (token) {
+        localStorage.setItem("accessToken", token);
+        document.cookie = `accessToken=${token}; path=/; max-age=86400; SameSite=Lax`;
+        
+        if (result?.token?.refresh_token) {
+           const refreshToken = result.token.refresh_token;
+           localStorage.setItem("refreshToken", refreshToken);
+           document.cookie = `refreshToken=${refreshToken}; path=/; max-age=604800; SameSite=Lax`;
+        }
+
+        if (result?.userName) {
+            localStorage.setItem("username", result.userName);
+            document.cookie = `user_name=${result.userName}; path=/; max-age=604800; SameSite=Lax`;
+        }
+
+        try {
+          const orgs = await authApi.getUserAllowedOrg();
+          let orgIdToSave = "temp"; 
+
+          if (Array.isArray(orgs) && orgs.length > 0) {
+            const firstOrg = orgs[0] as any;
+            orgIdToSave = typeof firstOrg === 'string' ? firstOrg : (firstOrg.orgCustomId || firstOrg.id || firstOrg.orgId || "temp");
+          }
+
+          localStorage.setItem("orgId", orgIdToSave);
+          document.cookie = `orgId=${orgIdToSave}; path=/; max-age=604800; SameSite=Lax`;
+        } catch (orgError) {
+          console.error("⚠️ Failed to fetch allowed org:", orgError);
+          localStorage.setItem("orgId", "temp");
+          document.cookie = `orgId=temp; path=/; max-age=604800; SameSite=Lax`;
+        }
+
+        toast.success("Login successful", { duration: 2000 });
 
         setTimeout(() => {
-          router.push("/overview"); 
-        }, 500);
+          window.location.href = "/overview"; 
+        }, 800);
+
       } else {
-        throw new Error("Invalid mock credentials (try admin/password)");
+        throw new Error("Token not received from server");
       }
 
     } catch (error: any) {
-      console.error("Login mock error:", error);
-      toast.error(error.message || "Mock Login failed");
+      console.error("Login error:", error);
+      
+      let errorTitle = "Access Denied";
+
+      if (error?.response?.status === 401 || error?.message?.includes("401")) {
+        errorTitle = "Invalid username or password";
+      } else if (error?.response?.status === 500) {
+        errorTitle = "Server Error";
+      } else {
+        errorTitle = error?.response?.data?.description 
+                  || error?.response?.data?.message 
+                  || error?.message 
+                  || "Login failed. Please check your credentials.";
+      }
+
+      toast.error(errorTitle, { duration: 5000 });
     }
   };
 

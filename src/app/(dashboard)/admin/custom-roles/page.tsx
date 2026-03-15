@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, Suspense } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useSearchParams, usePathname } from "next/navigation";
 import { 
@@ -26,7 +26,7 @@ const MOCK_ROLES = [
   { id: "r5", roleName: "Operator", description: "Manage basic sensor configurations and status.", tags: "System", status: "Active" },
 ];
 
-function CustomRolesContent() {
+export default function CustomRolesPage() {
   const pathname = usePathname(); 
   const searchParams = useSearchParams();
   const highlightIdParam = searchParams.get("highlight");
@@ -262,20 +262,5 @@ function CustomRolesContent() {
         </div>
       )}
     </div>
-  );
-}
-
-export default function CustomRolesPage() {
-  return (
-    <Suspense fallback={
-      <div className="flex flex-col h-screen bg-[#020617]">
-        <Navbar />
-        <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
-        </div>
-      </div>
-    }>
-      <CustomRolesContent />
-    </Suspense>
   );
 }

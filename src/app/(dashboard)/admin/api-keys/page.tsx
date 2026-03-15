@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, Suspense } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useSearchParams, usePathname } from "next/navigation";
 import { 
@@ -26,7 +26,7 @@ const MOCK_API_KEYS = [
   { id: "k5", keyName: "External-Scanner-API", description: "Third-party scanner integration key.", customRole: "Operator", roles: "Editor", status: "Pending" },
 ];
 
-function ApiKeysContent() {
+export default function ApiKeysPage() {
   const pathname = usePathname(); 
   const searchParams = useSearchParams();
   const highlightIdParam = searchParams.get("highlight");
@@ -263,17 +263,5 @@ function ApiKeysContent() {
         </div>
       )}
     </div>
-  );
-}
-
-export default function ApiKeysPage() {
-  return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center h-screen bg-[#020617]">
-        <div className="text-cyan-500 animate-pulse font-bold tracking-widest">LOADING...</div>
-      </div>
-    }>
-      <ApiKeysContent />
-    </Suspense>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, Suspense } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useSearchParams, usePathname } from "next/navigation";
 import { 
@@ -13,7 +13,6 @@ import {
   MoreHorizontal,
   Trash2,
   Copy,
-  Loader2
 } from "lucide-react";
 import { Navbar } from "@/src/components/layout/navbar"; 
 
@@ -26,7 +25,7 @@ const MOCK_USERS = [
   { orgUserId: "u5", userName: "root_system", userEmail: "root@localhost", rolesList: "Super Admin", userStatus: "Active", isOrgInitialUser: "YES", tags: "System", customRoleName: "Root" },
 ];
 
-function UsersContent() {
+export default function UsersPage() {
   const pathname = usePathname(); 
   const searchParams = useSearchParams();
   const highlightIdParam = searchParams.get("highlight");
@@ -374,20 +373,5 @@ function UsersContent() {
         </div>
       )}
     </div>
-  );
-}
-
-export default function UsersPage() {
-  return (
-    <Suspense fallback={
-      <div className="flex flex-col h-screen bg-[#020617]">
-        <Navbar />
-        <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
-        </div>
-      </div>
-    }>
-      <UsersContent />
-    </Suspense>
   );
 }

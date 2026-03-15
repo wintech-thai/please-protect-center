@@ -24,6 +24,8 @@ import { useState, useMemo, useEffect, useRef } from "react";
 
 import { UpdateProfileModal } from "@/src/components/modals/update-profile-modal";
 import { ChangePasswordModal } from "@/src/components/modals/change-password-modal";
+import { authApi } from "@/src/modules/auth/api/auth.api";
+import { toast } from "sonner"; 
 
 // --- Mock Data สำหรับ Organization Selector ---
 const mockOrganizations = [
@@ -63,7 +65,6 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
   const [selectedOrg, setSelectedOrg] = useState(mockOrganizations[0]);
   const [searchQuery, setSearchQuery] = useState("");
   
-  // Refs สำหรับ Click Outside
   const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const langDropdownRef = useRef<HTMLDivElement>(null);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
@@ -96,11 +97,29 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
   }, []);
 
   const handleLogout = async () => {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("username");
-    localStorage.removeItem("orgId");
-    router.push("/login");
+    try {
+      await authApi.signOut();
+    } catch (error) {
+      console.error("Logout API Failed:", error);
+    } finally {
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      localStorage.removeItem("username");
+      localStorage.removeItem("orgId");
+
+      document.cookie = "accessToken=; path=/; max-age=0; SameSite=Lax";
+      document.cookie = "refreshToken=; path=/; max-age=0; SameSite=Lax";
+      document.cookie = "user_name=; path=/; max-age=0; SameSite=Lax";
+      document.cookie = "orgId=; path=/; max-age=0; SameSite=Lax";
+
+      toast.success("Logout successful", {
+        duration: 2000,
+      });
+
+      setTimeout(() => {
+        window.location.href = "/login";
+      }, 800);
+    }
   };
 
   const navItems: NavItem[] = useMemo(() => [
@@ -231,7 +250,8 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
                       <input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#162032] border border-blue-900/50 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500" />
                     </div>
                   </div>
-                  <div className="max-h-60 overflow-y-auto p-1 custom-scrollbar">
+                  {/* ลบ custom-scrollbar ออก */}
+                  <div className="max-h-60 overflow-y-auto p-1 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
                     {filteredOrgs.map((org) => (
                       <button key={org.id} onClick={() => { setSelectedOrg(org); setIsOrgOpen(false); setSearchQuery(""); }} className={`w-full text-left px-3 py-2.5 rounded-lg text-sm mb-1 flex justify-between items-center transition-colors ${selectedOrg.id === org.id ? "bg-blue-600/20 text-cyan-400 font-semibold" : "text-slate-300 hover:bg-[#162032]"}`}>
                         {org.name}
@@ -346,13 +366,6 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
       />
 
       <div className="h-16 w-full shrink-0"></div>
-      
-      <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #334155; }
-      `}</style>
     </>
   );
 }

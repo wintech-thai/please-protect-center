@@ -8,11 +8,11 @@ import {
   ChevronRight, 
   ChevronLeft as ChevronLeftIcon,
   ChevronDown,
-  AlertTriangle,
   Loader2,
   Check,
   Copy,
-  UserPlus
+  Key,
+  AlertTriangle
 } from "lucide-react";
 import { Navbar } from "@/src/components/layout/navbar";
 
@@ -22,28 +22,42 @@ interface RoleItem {
   desc?: string; 
 }
 
-export default function CreateUserPage() {
+// --- Mock Data ---
+const MOCK_SYSTEM_ROLES = [
+  { id: "sr1", name: "Super Admin", desc: "Full system access, manage all modules and users." },
+  { id: "sr2", name: "Security Analyst", desc: "Monitor security events and manage threat detection." },
+  { id: "sr3", name: "Threat Hunter", desc: "Search for cyber threats and investigate incidents." },
+  { id: "sr4", name: "Viewer", desc: "Read-only access to dashboards and reports." },
+  { id: "sr5", name: "Editor", desc: "Can edit configurations but cannot manage users." },
+];
+
+const MOCK_CUSTOM_ROLES = [
+  { id: "cr1", name: "System Administrator", desc: "IT admin full access" },
+  { id: "cr2", name: "SOC Analyst Level 1", desc: "Basic monitoring" },
+  { id: "cr3", name: "Guest Viewer", desc: "External viewer" },
+];
+
+export default function CreateApiKeyPage() {
   const router = useRouter();
-  const pathname = usePathname(); 
+  const pathname = usePathname();
   const searchParams = useSearchParams();
-  
+
   const [returnToId, setReturnToId] = useState<string | null>(null);
+  const [createdKeyId, setCreatedKeyId] = useState<string | null>(null);
 
   // --- Form State ---
   const [formData, setFormData] = useState({
-    username: "",
-    email: "",
-    tags: [] as string[],
+    keyName: "",
+    description: "",
     customRole: "",
   });
 
-  const [tagInput, setTagInput] = useState("");
-  
-  // --- Roles State (Mock Data) ---
+  // --- Roles State ---
   const [customRolesList, setCustomRolesList] = useState<RoleItem[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // --- Transfer List State ---
   const [leftRoles, setLeftRoles] = useState<RoleItem[]>([]);
   const [rightRoles, setRightRoles] = useState<RoleItem[]>([]);
   const [checkedLeft, setCheckedLeft] = useState<string[]>([]);
@@ -52,61 +66,41 @@ export default function CreateUserPage() {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [showExitDialog, setShowExitDialog] = useState(false);
 
-  // --- Invite Modal State ---
-  const [showInviteModal, setShowInviteModal] = useState(false);
-  const [inviteLink, setInviteLink] = useState("");
+  // --- Success Modal State ---
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [createdToken, setCreatedToken] = useState("");
   const [isCopied, setIsCopied] = useState(false);
-  const [createdUserId, setCreatedUserId] = useState<string | null>(null);
 
   useEffect(() => {
     const prevHighlight = searchParams.get("prevHighlight");
     if (prevHighlight) {
-        setReturnToId(prevHighlight);
+        setReturnToId(prevHighlight); 
         const params = new URLSearchParams(searchParams.toString());
         params.delete("prevHighlight");
-        window.history.replaceState(null, '', `${pathname}?${params.toString()}`);
+        window.history.replaceState(null, '', params.toString() ? `${pathname}?${params.toString()}` : pathname);
     }
   }, [searchParams, pathname]);
 
   const goBack = () => {
     if (returnToId) {
-        router.push(`/admin/users?highlight=${returnToId}`);
+        router.push(`/admin/api-keys?highlight=${returnToId}`);
     } else {
-        router.back();
+        router.push("/admin/api-keys");
     }
   };
 
+  // --- Fetch Mock Data ---
   useEffect(() => {
-    setIsLoadingData(true);
-    setTimeout(() => {
-      setLeftRoles([
-        { id: "sr1", name: "Super Admin", desc: "Full system access, manage all modules and users." },
-        { id: "sr2", name: "Security Analyst", desc: "Monitor security events and manage threat detection." },
-        { id: "sr3", name: "Threat Hunter", desc: "Search for cyber threats and investigate incidents." },
-        { id: "sr4", name: "Viewer", desc: "Read-only access to dashboards and reports." },
-      ]);
-      setCustomRolesList([
-        { id: "cr1", name: "System Administrator" },
-        { id: "cr2", name: "SOC Analyst Level 1" },
-        { id: "cr3", name: "Guest Viewer" },
-      ]);
-      setIsLoadingData(false);
-    }, 600);
+    const initData = async () => {
+      setIsLoadingData(true);
+      setTimeout(() => {
+        setLeftRoles(MOCK_SYSTEM_ROLES);
+        setCustomRolesList(MOCK_CUSTOM_ROLES);
+        setIsLoadingData(false);
+      }, 600);
+    };
+    initData();
   }, []);
-
-  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && tagInput.trim()) {
-      e.preventDefault();
-      if (!formData.tags.includes(tagInput.trim())) {
-        setFormData(prev => ({ ...prev, tags: [...prev.tags, tagInput.trim()] }));
-      }
-      setTagInput("");
-    }
-  };
-
-  const removeTag = (tagToRemove: string) => {
-    setFormData(prev => ({ ...prev, tags: prev.tags.filter(t => t !== tagToRemove) }));
-  };
 
   const handleCheck = (id: string, side: "left" | "right") => {
     if (side === "left") {
@@ -131,50 +125,45 @@ export default function CreateUserPage() {
   };
 
   const handleCancel = () => {
-    const isDirty = formData.username.trim() !== "" || formData.email.trim() !== "" || formData.tags.length > 0 || formData.customRole !== "" || rightRoles.length > 0 || tagInput.trim() !== "";
+    const isDirty = formData.keyName.trim() !== "" || formData.description.trim() !== "" || formData.customRole !== "" || rightRoles.length > 0;
     if (isDirty) setShowExitDialog(true);
     else goBack(); 
   };
 
-  // Mock Submit Form 
   const handleSubmit = async () => {
-    let finalTags = [...formData.tags];
-    const pendingTag = tagInput.trim();
-    if (pendingTag && !finalTags.includes(pendingTag)) finalTags.push(pendingTag);
-
     const newErrors: { [key: string]: string } = {};
-    if (!formData.username) newErrors.username = "Username is required";
-    if (!formData.email) newErrors.email = "Email is required";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = "Invalid email format";
-    if (finalTags.length === 0) newErrors.tags = "At least one tag is required";
+    if (!formData.keyName.trim()) newErrors.keyName = "Key Name is required"; 
+    if (!formData.description.trim()) newErrors.description = "Description is required";
     
     setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) return;
 
-    if (Object.keys(newErrors).length === 0) {
-      setIsSubmitting(true);
-      setTimeout(() => {
+    setIsSubmitting(true);
+    setTimeout(() => {
         setIsSubmitting(false);
-        setCreatedUserId(`mock-user-${Math.floor(Math.random() * 1000)}`);
+        const newId = `mock-key-${Math.floor(Math.random() * 1000)}`;
+        setCreatedKeyId(newId);
         
-        const token = Math.random().toString(36).substring(2, 15);
-        const domain = typeof window !== "undefined" ? window.location.host : "protect.center";
-        setInviteLink(`https://${domain}/register?token=${token}`);
-        
-        setShowInviteModal(true);
-      }, 1000);
-    }
+        // Generate Mock Token
+        const tokenStr = `sk_live_${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
+        setCreatedToken(tokenStr);
+        setShowSuccessModal(true);
+    }, 1000);
   };
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(inviteLink);
+  const handleCopyToken = () => {
+    navigator.clipboard.writeText(createdToken);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
   };
 
   const handleFinish = () => {
-    setShowInviteModal(false);
-    if (createdUserId) router.push(`/admin/users?highlight=${createdUserId}`);
-    else goBack();
+    setShowSuccessModal(false);
+    if (createdKeyId) {
+        router.push(`/admin/api-keys?highlight=${createdKeyId}`);
+    } else {
+        goBack();
+    }
   };
 
   if (isLoadingData) {
@@ -184,7 +173,7 @@ export default function CreateUserPage() {
         <div className="flex-1 flex items-center justify-center text-slate-400">
           <div className="flex flex-col items-center gap-3">
             <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-            <span>Loading...</span>
+            <span>Loading...</span> 
           </div>
         </div>
       </div>
@@ -205,69 +194,49 @@ export default function CreateUserPage() {
                 <ChevronLeft className="w-5 h-5" />
             </button>
             <div>
-                <h1 className="text-2xl font-bold text-white tracking-tight">Create User</h1>
-                <p className="text-slate-400 text-sm mt-0.5">Add a new user to the organization</p>
+                <h1 className="text-2xl font-bold text-white tracking-tight">Create API Key</h1>
+                <p className="text-slate-400 text-sm mt-0.5">Generate a new authentication key for system integrations</p>
             </div>
         </div>
       </div>
 
-      {/* Main Form Area */}
+      {/* Main Content */}
       <div className="flex-1 overflow-y-auto pb-8 custom-scrollbar">
         <div className="px-4 md:px-8 space-y-6 w-full"> 
             
-            {/* User Info Box */}
+            {/* Key Information Box */}
             <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 shadow-sm">
                 <h2 className="text-base font-semibold text-white mb-6 flex items-center gap-2 border-b border-slate-800 pb-3">
                     <span className="w-1 h-5 bg-blue-500 rounded-full"></span>
-                    User Information
+                    Key Information
                 </h2>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-300">Username <span className="text-red-400">*</span></label>
+                        <label className="text-sm font-medium text-slate-300">Key Name <span className="text-red-400">*</span></label>
                         <input 
                             type="text" 
-                            placeholder="e.g. johndoe"
-                            value={formData.username}
-                            onChange={e => setFormData({...formData, username: e.target.value})}
-                            className={`w-full bg-slate-950 border ${errors.username ? 'border-red-500/50 focus:border-red-500' : 'border-slate-700 focus:border-blue-500'} rounded-lg px-4 py-2.5 text-slate-200 outline-none transition-all placeholder:text-slate-600 text-sm`}
+                            placeholder="e.g. Sentinel-Integration-01"
+                            value={formData.keyName}
+                            onChange={e => setFormData({...formData, keyName: e.target.value})}
+                            className={`w-full bg-slate-950 border ${errors.keyName ? 'border-red-500/50 focus:border-red-500' : 'border-slate-700 focus:border-blue-500'} rounded-lg px-4 py-2.5 text-slate-200 outline-none transition-all placeholder:text-slate-600 text-sm`}
                         />
-                        {errors.username && <p className="text-red-400 text-xs">{errors.username}</p>}
+                        {errors.keyName && <p className="text-red-400 text-xs">{errors.keyName}</p>}
                     </div>
-
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-300">Email <span className="text-red-400">*</span></label>
+                        <label className="text-sm font-medium text-slate-300">Description <span className="text-red-400">*</span></label>
                         <input 
                             type="text" 
-                            placeholder="name@example.com"
-                            value={formData.email}
-                            onChange={e => setFormData({...formData, email: e.target.value})}
-                            className={`w-full bg-slate-950 border ${errors.email ? 'border-red-500/50 focus:border-red-500' : 'border-slate-700 focus:border-blue-500'} rounded-lg px-4 py-2.5 text-slate-200 outline-none transition-all placeholder:text-slate-600 text-sm`}
+                            placeholder="What is this key used for?"
+                            value={formData.description}
+                            onChange={e => setFormData({...formData, description: e.target.value})}
+                            className={`w-full bg-slate-950 border ${errors.description ? 'border-red-500/50 focus:border-red-500' : 'border-slate-700 focus:border-blue-500'} rounded-lg px-4 py-2.5 text-slate-200 outline-none transition-all placeholder:text-slate-600 text-sm`}
                         />
-                          {errors.email && <p className="text-red-400 text-xs">{errors.email}</p>}
+                        {errors.description && <p className="text-red-400 text-xs">{errors.description}</p>}
                     </div>
-                </div>
-                
-                <div className="space-y-2 mt-6">
-                    <label className="text-sm font-medium text-slate-300">Tags <span className="text-red-400">*</span></label>
-                    <div className={`w-full bg-slate-950 border ${errors.tags ? 'border-red-500/50' : 'border-slate-700 focus-within:border-blue-500'} rounded-lg px-3 py-2 min-h-[46px] flex flex-wrap gap-2 items-center transition-all`}>
-                        {formData.tags.map(tag => (
-                            <span key={tag} className="bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium px-2.5 py-1 rounded-full flex items-center gap-1.5 animate-in fade-in zoom-in duration-200">
-                                {tag}
-                                <button onClick={() => removeTag(tag)} className="hover:text-white hover:bg-blue-500/20 rounded-full p-0.5 transition-colors"><X className="w-3 h-3" /></button>
-                            </span>
-                        ))}
-                        <input 
-                            type="text" value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={handleTagKeyDown}
-                            placeholder={formData.tags.length === 0 ? "Type and press Enter to add tags" : ""}
-                            className="bg-transparent outline-none text-slate-200 flex-1 min-w-[150px] text-sm placeholder:text-slate-600 h-full py-1"
-                        />
-                    </div>
-                    {errors.tags && <p className="text-red-400 text-xs">{errors.tags}</p>}
                 </div>
             </div>
 
-            {/* Roles Setup Box */}
+            {/* Roles Section */}
             <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 shadow-sm">
                 <h2 className="text-base font-semibold text-white mb-6 flex items-center gap-2 border-b border-slate-800 pb-3">
                     <span className="w-1 h-5 bg-purple-500 rounded-full"></span>
@@ -293,11 +262,12 @@ export default function CreateUserPage() {
                     </div>
                 </div>
 
+                {/* System Roles Transfer List */}
                 <div>
                     <h3 className="text-sm font-medium text-slate-300 mb-3">System Roles Assignment</h3>
-                    
                     <div className="flex flex-col md:flex-row gap-4 items-center">
-                        {/* Left List */}
+                        
+                        {/* Available Roles (Left) */}
                         <div className="flex-1 w-full bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex flex-col h-[320px]">
                             <div className="px-4 py-3 bg-slate-900/80 border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider flex justify-between items-center">
                                 <span>Available Roles</span>
@@ -326,7 +296,7 @@ export default function CreateUserPage() {
                             </div>
                         </div>
 
-                        {/* Transfer Buttons */}
+                        {/* Middle Transfer Buttons */}
                         <div className="flex flex-row md:flex-col gap-3 relative z-10">
                              <button onClick={moveRight} disabled={checkedLeft.length === 0} className="p-2.5 bg-slate-800 hover:bg-blue-600 disabled:opacity-30 disabled:hover:bg-slate-800 rounded-full border border-slate-700 text-slate-300 hover:text-white transition-all shadow-lg">
                                  <ChevronRight className="w-5 h-5" />
@@ -336,7 +306,7 @@ export default function CreateUserPage() {
                              </button>
                         </div>
 
-                        {/* Right List */}
+                        {/* Selected Roles (Right) */}
                         <div className="flex-1 w-full bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex flex-col h-[320px]">
                             <div className="px-4 py-3 bg-slate-900/80 border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider flex justify-between items-center">
                                 <span>Selected Roles</span>
@@ -375,11 +345,8 @@ export default function CreateUserPage() {
       </div>
 
       {/* Footer Buttons */}
-      <div className="flex-none p-4 md:px-8 border-t border-slate-800 bg-slate-950 flex justify-end gap-3 z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-            <button 
-                onClick={handleCancel} 
-                className="px-6 py-2.5 rounded-lg border border-red-500/50 text-red-500 hover:bg-red-500/10 transition-all font-medium text-sm"
-            >
+      <div className="flex-none p-4 md:px-8 border-t border-slate-800 bg-slate-950 flex justify-end gap-3 z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+            <button onClick={handleCancel} className="px-6 py-2.5 rounded-lg border border-red-500/50 text-red-500 hover:bg-red-500/10 transition-all font-medium text-sm">
                 Cancel
             </button>
             <button 
@@ -391,18 +358,18 @@ export default function CreateUserPage() {
             </button>
       </div>
 
-      {/* Invite Modal */}
-      {showInviteModal && (
+      {/* Success Modal */}
+      {showSuccessModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-300 px-4">
-            <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md p-6 transform scale-100 animate-in zoom-in-95 duration-300">
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md p-6 transform scale-100 animate-in zoom-in-95 duration-300 relative overflow-hidden">
                 <div className="flex flex-col items-center text-center">
-                    <div className="w-14 h-14 bg-green-500/10 rounded-full flex items-center justify-center mb-4 border border-green-500/20"><UserPlus className="w-7 h-7 text-green-400" /></div>
-                    <h3 className="text-xl font-bold text-white mb-1">User Created!</h3>
-                    <p className="text-sm text-slate-400 mb-6 px-4 leading-relaxed">Copy the registration link below and send it to the user to complete their setup.</p>
+                    <div className="w-14 h-14 bg-green-500/10 rounded-full flex items-center justify-center mb-4 border border-green-500/20"><Key className="w-7 h-7 text-green-400" /></div>
+                    <h3 className="text-xl font-bold text-white mb-1">API Key Created!</h3>
+                    <p className="text-sm text-slate-400 mb-6 px-4 leading-relaxed">Please copy this key now. You will not be able to see it again.</p>
                     
                     <div className="w-full bg-slate-950 border border-slate-800 rounded-lg p-1.5 flex items-center gap-2 mb-6 shadow-inner">
-                        <div className="flex-1 bg-transparent px-3 text-sm text-slate-300 truncate font-mono select-all text-left">{inviteLink}</div>
-                        <button onClick={handleCopyLink} className={`p-2 rounded-md transition-all duration-200 ${isCopied ? "bg-green-500 text-white shadow-lg" : "bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700"}`}>
+                        <div className="flex-1 bg-transparent px-3 text-sm text-yellow-400 font-mono select-all text-left break-all">{createdToken}</div>
+                        <button onClick={handleCopyToken} className={`p-2 rounded-md transition-all duration-200 flex-none ${isCopied ? "bg-green-500 text-white shadow-lg" : "bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700"}`}>
                             {isCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                         </button>
                     </div>
@@ -419,7 +386,7 @@ export default function CreateUserPage() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200 px-4">
             <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-sm p-6 text-center">
                 <div className="w-14 h-14 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4 border border-red-500/20"><AlertTriangle className="w-8 h-8 text-red-500" /></div>
-                <h3 className="text-lg font-bold text-white">Discard User?</h3>
+                <h3 className="text-lg font-bold text-white">Discard Changes?</h3>
                 <p className="text-sm text-slate-400 mt-2 mb-6">You have unsaved information. Are you sure you want to leave?</p>
                 <div className="flex justify-end gap-3 w-full">
                     <button onClick={() => setShowExitDialog(false)} className="flex-1 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 rounded-lg transition-colors">Stay</button>
