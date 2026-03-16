@@ -11,6 +11,8 @@ import {
   AlertTriangle
 } from "lucide-react";
 import { Navbar } from "@/src/components/layout/navbar";
+import { toast } from "sonner";
+import { roleApi } from "@/src/modules/auth/api/role.api"; 
 
 // --- Interfaces ---
 interface PermissionItem {
@@ -22,69 +24,6 @@ interface PermissionNode {
   category: string;
   items: PermissionItem[];
 }
-
-interface RoleDetail {
-  roleId: string;
-  roleName: string;
-  roleDescription: string;
-  description?: string; 
-  tags: string | string[]; 
-  permissions: {
-      controllerName: string;
-      apiPermissions: {
-          apiName: string;
-          isAllowed: boolean;
-      }[];
-  }[];
-}
-
-// --- Mock Data ---
-const MOCK_PERMISSIONS: PermissionNode[] = [
-  {
-    category: "Users Management",
-    items: [
-      { code: "users.create", label: "Create User" },
-      { code: "users.read", label: "View Users List" },
-      { code: "users.update", label: "Edit User Info" },
-      { code: "users.delete", label: "Delete User" },
-    ]
-  },
-  {
-    category: "Roles & Permissions",
-    items: [
-      { code: "roles.manage", label: "Manage System Roles" },
-      { code: "custom_roles.create", label: "Create Custom Role" },
-    ]
-  },
-  {
-    category: "Sensor Configurations",
-    items: [
-      { code: "sensor.view", label: "View Sensor Status" },
-      { code: "sensor.config", label: "Change Sensor Configurations" },
-    ]
-  }
-];
-
-const MOCK_ROLE_DETAIL: RoleDetail = {
-  roleId: "cr1",
-  roleName: "Security Analyst",
-  roleDescription: "Analyze and monitor security alerts.",
-  tags: "Security,HQ",
-  permissions: [
-    {
-      controllerName: "Users Management",
-      apiPermissions: [
-        { apiName: "users.read", isAllowed: true },
-      ]
-    },
-    {
-      controllerName: "Sensor Configurations",
-      apiPermissions: [
-        { apiName: "sensor.view", isAllowed: true },
-      ]
-    }
-  ]
-};
 
 export default function UpdateCustomRolePage() {
   const router = useRouter();
@@ -106,7 +45,7 @@ export default function UpdateCustomRolePage() {
     tags: [] as string[],
   });
   
-  const [originalRole, setOriginalRole] = useState<RoleDetail | null>(null);
+  const [originalRole, setOriginalRole] = useState<any>(null);
   const [originalPermissions, setOriginalPermissions] = useState<string[]>([]); 
 
   const [tagInput, setTagInput] = useState("");
@@ -135,17 +74,52 @@ export default function UpdateCustomRolePage() {
     }
   };
 
+
   useEffect(() => {
     const initData = async () => {
       if (!roleId) return;
-
       setIsLoading(true);
       
-      // Simulate API Call
-      setTimeout(() => {
-        setPermissionList(MOCK_PERMISSIONS);
+      try {
+        const orgId = localStorage.getItem("orgId") || "temp";
+
+        const [permsRes, roleRes]: [any, any] = await Promise.all([
+            roleApi.getInitialUserRolePermissions(orgId),
+            roleApi.getCustomRoleById(orgId, roleId)
+        ]);
+
+        let rawPermissions: any[] = [];
+        if (Array.isArray(permsRes)) rawPermissions = permsRes;
+        else if (Array.isArray(permsRes?.data)) rawPermissions = permsRes.data;
+        else if (Array.isArray(permsRes?.permissions)) rawPermissions = permsRes.permissions;
+        else if (permsRes?.data?.permissions) rawPermissions = permsRes.data.permissions;
+
+        const grouped: { [key: string]: PermissionItem[] } = {};
         
-        const targetRole = MOCK_ROLE_DETAIL;
+        rawPermissions.forEach((group: any) => {
+            const categoryName = group.controllerName || "Uncategorized";
+            if (!grouped[categoryName]) grouped[categoryName] = [];
+            
+            if (Array.isArray(group.apiPermissions)) {
+                group.apiPermissions.forEach((perm: any) => {
+                    const code = `${group.controllerName}.${perm.apiName}`;
+                    grouped[categoryName].push({
+                        code: code,
+                        label: perm.apiName
+                    });
+                });
+            }
+        });
+
+        const finalPermissions: PermissionNode[] = Object.keys(grouped).map(cat => ({
+            category: cat,
+            items: grouped[cat]
+        }));
+        setPermissionList(finalPermissions);
+
+        let targetRole = roleRes?.customRole || roleRes?.data || roleRes;
+        if (!targetRole) throw new Error("Role data not found");
+
         setOriginalRole(targetRole);
 
         let tagsArray: string[] = [];
@@ -156,23 +130,34 @@ export default function UpdateCustomRolePage() {
         }
 
         setFormData({
-            roleName: targetRole.roleName || "",
+            roleName: targetRole.customRoleName || targetRole.roleName || "",
             description: targetRole.roleDescription || targetRole.description || "",
             tags: tagsArray
         });
 
         const activePerms: string[] = [];
-        targetRole.permissions.forEach((group: any) => {
-            group.apiPermissions.forEach((perm: any) => {
-                if (perm.isAllowed) activePerms.push(perm.apiName);
+        if (Array.isArray(targetRole.permissions)) {
+            targetRole.permissions.forEach((group: any) => {
+                if (Array.isArray(group.apiPermissions)) {
+                    group.apiPermissions.forEach((perm: any) => {
+                        if (perm.isAllowed) {
+                            activePerms.push(`${group.controllerName}.${perm.apiName}`);
+                        }
+                    });
+                }
             });
-        });
+        }
         
         setSelectedPermissions(activePerms);
-        setOriginalPermissions(activePerms); 
-        
+        setOriginalPermissions(activePerms);
+
+      } catch (error: any) {
+        console.error("Init Data Error:", error);
+        toast.error("Failed to load role data");
+        goBack(); 
+      } finally {
         setIsLoading(false);
-      }, 600);
+      }
     };
 
     initData();
@@ -197,7 +182,7 @@ export default function UpdateCustomRolePage() {
   const checkIsDirty = () => {
     if (!originalRole) return false;
 
-    if (formData.roleName !== originalRole.roleName) return true;
+    if (formData.roleName !== (originalRole.customRoleName || originalRole.roleName)) return true;
     if (formData.description !== (originalRole.roleDescription || originalRole.description || "")) return true;
     
     const originalTagsStr = Array.isArray(originalRole.tags) 
@@ -260,7 +245,6 @@ export default function UpdateCustomRolePage() {
     const newErrors: { [key: string]: string } = {};
     if (!formData.roleName.trim()) newErrors.roleName = "Role Name is required";
     if (!formData.description.trim()) newErrors.description = "Description is required";
-    if (finalTags.length === 0) newErrors.tags = "At least one tag is required";
     
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) return;
@@ -271,11 +255,45 @@ export default function UpdateCustomRolePage() {
     }
 
     setIsSubmitting(true);
-    setTimeout(() => {
-        setIsSubmitting(false);
-        alert("Role Updated Successfully (Mock)");
+    try {
+        const orgId = localStorage.getItem("orgId") || "temp";
+
+        const formattedPermissions = permissionList.map(group => ({
+            controllerName: group.category,
+            apiPermissions: group.items.map(item => ({
+                controllerName: group.category,
+                apiName: item.label, 
+                isAllowed: selectedPermissions.includes(item.code)
+            }))
+        }));
+
+        const payload = {
+            RoleName: formData.roleName,
+            RoleDescription: formData.description,
+            Tags: finalTags.join(","),
+            Permissions: formattedPermissions 
+        };
+
+        await roleApi.updateCustomRoleById(orgId, roleId, payload);
+        
+        toast.success("Role updated successfully!");
         goBack();
-    }, 1000);
+
+    } catch (error: any) {
+        console.error("Update role error:", error);
+        
+        let errorMsg = "Failed to update role";
+        if (error?.response?.data?.errors) {
+            const firstErrorKey = Object.keys(error.response.data.errors)[0];
+            errorMsg = error.response.data.errors[firstErrorKey][0];
+        } else {
+            errorMsg = error?.response?.data?.description || error?.message || errorMsg;
+        }
+
+        toast.error(errorMsg);
+    } finally {
+        setIsSubmitting(false);
+    }
   };
 
   if (isLoading) {
@@ -306,7 +324,7 @@ export default function UpdateCustomRolePage() {
                 <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
                     Update Custom Role
                     <span className="text-xs font-normal text-slate-500 px-2 py-0.5 rounded-full border border-slate-800 bg-slate-900 font-mono">
-                      {originalRole?.roleName}
+                      {originalRole?.customRoleName || originalRole?.roleName}
                     </span>
                 </h1>
                 <p className="text-slate-400 text-sm mt-0.5">Modify role permissions and access levels</p>
@@ -452,7 +470,6 @@ export default function UpdateCustomRolePage() {
             <button onClick={handleCancel} className="px-6 py-2.5 rounded-lg border border-red-500/50 text-red-500 hover:bg-red-500/10 transition-all font-medium text-sm">
                 Cancel
             </button>
-            {/* ✅ ปุ่ม Save ไม่ต้อง Disabled เวลายังไม่แก้ข้อมูล (แต่จะ disabled ตอน Loading submit เท่านั้น) */}
             <button 
                 onClick={handleSubmit} 
                 disabled={isSubmitting} 

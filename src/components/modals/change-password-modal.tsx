@@ -2,6 +2,8 @@
 
 import { X, Loader2 } from "lucide-react"; 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { profileApi } from "@/src/modules/auth/api/profile.api"; 
 
 interface ChangePasswordModalProps {
   isOpen: boolean;
@@ -57,28 +59,42 @@ export function ChangePasswordModal({
     const { currentPassword, newPassword, confirmPassword } = formData;
 
     if (!currentPassword || !newPassword || !confirmPassword) {
-      alert("Please fill in all fields."); 
+      toast.error("Please fill in all fields."); 
       return;
     }
 
     const validationError = validatePassword(newPassword);
     if (validationError) {
-      alert(validationError);
+      toast.error(validationError);
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      alert("New password and confirm password do not match."); 
+      toast.error("New password and confirm password do not match."); 
       return;
     }
 
     setIsLoading(true);
     
-    setTimeout(() => {
+    try {
+      const orgId = localStorage.getItem("orgId") || "temp";
+      const userName = localStorage.getItem("userName") || ""; 
+      const payload = {
+        userName: userName,
+        currentPassword: currentPassword,
+        newPassword: newPassword
+      };
+
+      await profileApi.updatePassword(orgId, payload);
+
+      toast.success("Password changed successfully!");
+      onClose(); 
+    } catch (error: any) {
+      console.error("Change password error:", error);
+      toast.error(error?.response?.data?.message || "Failed to change password. Please check your current password.");
+    } finally {
       setIsLoading(false);
-      alert("Password changed successfully! (Mock)");
-      onClose();
-    }, 1500);
+    }
   };
 
   if (!isVisible) return null;

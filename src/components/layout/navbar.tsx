@@ -21,6 +21,12 @@ import {
   Search
 } from "lucide-react";
 import { useState, useMemo, useEffect, useRef } from "react";
+import { 
+  Tooltip, 
+  TooltipTrigger, 
+  TooltipContent, 
+  TooltipProvider 
+} from "@/src/components/ui/tooltip";
 
 import { UpdateProfileModal } from "@/src/components/modals/update-profile-modal";
 import { ChangePasswordModal } from "@/src/components/modals/change-password-modal";
@@ -54,8 +60,8 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   
-  const [username, setUsername] = useState<string | null>("Admin"); // Mock Default
-  const [language, setLanguage] = useState("EN"); // Mock Language
+  const [username, setUsername] = useState<string | null>("Admin"); 
+  const [language, setLanguage] = useState("EN"); 
 
   // States สำหรับ Custom Dropdowns
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
@@ -250,7 +256,6 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
                       <input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#162032] border border-blue-900/50 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500" />
                     </div>
                   </div>
-                  {/* ลบ custom-scrollbar ออก */}
                   <div className="max-h-60 overflow-y-auto p-1 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
                     {filteredOrgs.map((org) => (
                       <button key={org.id} onClick={() => { setSelectedOrg(org); setIsOrgOpen(false); setSearchQuery(""); }} className={`w-full text-left px-3 py-2.5 rounded-lg text-sm mb-1 flex justify-between items-center transition-colors ${selectedOrg.id === org.id ? "bg-blue-600/20 text-cyan-400 font-semibold" : "text-slate-300 hover:bg-[#162032]"}`}>
@@ -285,25 +290,38 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
               )}
             </div>
 
-            {/* User Profile Dropdown */}
+            {/* 🚀 2. ส่วนของ User Profile ที่มี Tooltip */}
             <div className="relative hidden sm:block" ref={profileDropdownRef}>
-              <button onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)} className="flex items-center justify-center outline-none group" title={username || "User"}>
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-900 to-slate-800 border border-blue-700/50 flex items-center justify-center shadow-[0_0_10px_rgba(59,130,246,0.15)] group-hover:border-cyan-500/50 transition-all duration-300">
-                      <User className="w-5 h-5 text-blue-200 group-hover:text-cyan-400 transition-colors" />
-                  </div>
-              </button>
+              <TooltipProvider delayDuration={400}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button 
+                      onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)} 
+                      className="flex items-center justify-center outline-none group"
+                    >
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-900 to-slate-800 border border-blue-700/50 flex items-center justify-center shadow-[0_0_10px_rgba(59,130,246,0.15)] group-hover:border-cyan-500/50 transition-all duration-300">
+                        <User className="w-5 h-5 text-blue-200 group-hover:text-cyan-400 transition-colors" />
+                      </div>
+                    </button>
+                  </TooltipTrigger>
+                  
+                  <TooltipContent side="bottom" sideOffset={10} className="bg-slate-800 border-blue-900/50 text-white shadow-xl px-3 py-1.5">
+                    <p className="font-semibold text-xs tracking-wide">{username}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
 
               {isProfileDropdownOpen && (
                 <div className="absolute right-0 top-full mt-2 w-[200px] p-1 bg-[#0B1120] border border-blue-900/30 shadow-2xl rounded-lg text-blue-100 animate-in fade-in slide-in-from-top-2">
-                    <button onClick={() => { setShowProfileModal(true); setIsProfileDropdownOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-sm rounded-md text-slate-300 hover:bg-blue-900/40 hover:text-cyan-400 transition-colors">
-                        <User className="w-4 h-4" /> <span>Profile</span>
-                    </button>
-                    <button onClick={() => { setShowPasswordModal(true); setIsProfileDropdownOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-sm rounded-md text-slate-300 hover:bg-blue-900/40 hover:text-cyan-400 transition-colors">
-                        <Lock className="w-4 h-4" /> <span>Change Password</span>
-                    </button>
-                    <button onClick={handleLogout} className="w-full flex items-center gap-2 px-3 py-2.5 text-sm rounded-md text-red-400 hover:bg-red-900/20 hover:text-red-300 transition-colors border-t border-blue-900/30 mt-1">
-                        <LogOut className="w-4 h-4" /> <span>Logout</span>
-                    </button>
+                  <button onClick={() => { setShowProfileModal(true); setIsProfileDropdownOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-sm rounded-md text-slate-300 hover:bg-blue-900/40 hover:text-cyan-400 transition-colors">
+                    <User className="w-4 h-4" /> <span>Profile</span>
+                  </button>
+                  <button onClick={() => { setShowPasswordModal(true); setIsProfileDropdownOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-sm rounded-md text-slate-300 hover:bg-blue-900/40 hover:text-cyan-400 transition-colors">
+                    <Lock className="w-4 h-4" /> <span>Change Password</span>
+                  </button>
+                  <button onClick={handleLogout} className="w-full flex items-center gap-2 px-3 py-2.5 text-sm rounded-md text-red-400 hover:bg-red-900/20 hover:text-red-300 transition-colors border-t border-blue-900/30 mt-1">
+                    <LogOut className="w-4 h-4" /> <span>Logout</span>
+                  </button>
                 </div>
               )}
             </div>

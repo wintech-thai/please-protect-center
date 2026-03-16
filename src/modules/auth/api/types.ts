@@ -50,11 +50,27 @@ export interface UpdatePasswordPayload {
 }
 
 export interface InviteUserPayload {
-  userName: string;
-  tmpUserEmail: string;
-  tags: string;
-  customRoleId: string;
-  roles: string[];
+  orgUserId?: string;
+  orgCustomId?: string;
+  userId?: string;
+  userName?: string;
+  createdDate?: string;
+  rolesList?: string;
+  isOrgInitialUser?: string;
+  userStatus?: string;
+  tmpUserEmail?: string;
+  previousUserStatus?: string;
+  invitedDate?: string;
+  invitedBy?: string;
+  tags?: string;
+  customRoleId?: string;
+  TmpUserEmail: string;
+  orgName?: string;
+  orgDesc?: string;
+  orgType?: string;
+  roles?: string[];
+  customRoleName?: string;
+  customRoleDesc?: string;
 }
 
 export interface CreateApiKeyPayload {
@@ -80,4 +96,65 @@ export interface GetSubnetsParams {
   offset?: number;
   limit?: number;
   fullTextSearch?: string;
+}
+
+export interface GetRolesPayload {
+  offset?: number;
+  limit?: number;
+  fullTextSearch?: string;
+  fromDate?: string; 
+  toDate?: string;   
+}
+
+export interface GetCustomRolesPayload extends GetRolesPayload {
+  level?: string;
+}
+
+export interface RoleItem {
+  id?: string;
+  name?: string;
+  description?: string;
+}
+
+export interface CustomRoleItem {
+  id?: string;
+  name?: string;
+  level?: string;
+}
+
+export interface UserItem {
+  orgUserId: string;
+  orgCustomId: string;
+  userId: string;
+  userName: string;
+  createdDate: string;
+  rolesList: string;
+  isOrgInitialUser: string;
+  userStatus: string;
+  tmpUserEmail: string | null;
+  previousUserStatus: string;
+  invitedDate: string;
+  invitedBy: string | null;
+  tags: string | null;
+  customRoleId: string | null;
+  userEmail: string | null;
+  orgName: string | null;
+  orgDesc: string | null;
+  orgType: string | null;
+  roles: string[];
+  customRoleName: string | null;
+  customRoleDesc: string | null;
+}
+
+export interface GetUsersPayload {
+  offset?: number;
+  limit?: number;
+  fullTextSearch?: string;
+}
+
+export interface GetUsersResponse {
+  data: UserItem[];
+  totalCount: number;
+  status?: string;
+  message?: string;
 }

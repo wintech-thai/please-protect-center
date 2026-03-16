@@ -8,7 +8,6 @@ import {
   ChevronDown, 
   ChevronLeft, 
   ChevronRight, 
-  Check,
   X,
   MoreHorizontal,
   Trash2,
@@ -16,15 +15,8 @@ import {
   Loader2
 } from "lucide-react";
 import { Navbar } from "@/src/components/layout/navbar"; 
-
-// --- Mock Data สำหรับตาราง Role ---
-const MOCK_ROLES = [
-  { id: "r1", roleName: "Super Admin", description: "Full system access, manage all modules and users.", tags: "System,HQ", status: "Active" },
-  { id: "r2", roleName: "Security Analyst", description: "Monitor security events and manage threat detection.", tags: "Analyst", status: "Active" },
-  { id: "r3", roleName: "Threat Hunter", description: "Search for cyber threats and investigate incidents.", tags: "Cyber", status: "Pending" },
-  { id: "r4", roleName: "Viewer", description: "Read-only access to dashboards and reports.", tags: "Guest", status: "Disabled" },
-  { id: "r5", roleName: "Operator", description: "Manage basic sensor configurations and status.", tags: "System", status: "Active" },
-];
+import { toast } from "sonner";
+import { roleApi } from "@/src/modules/auth/api/role.api"; 
 
 export default function CustomRolesPage() {
   const pathname = usePathname(); 
@@ -32,8 +24,10 @@ export default function CustomRolesPage() {
   const highlightIdParam = searchParams.get("highlight");
 
   // States
-  const [roles, setRoles] = useState(MOCK_ROLES);
-  const [totalCount, setTotalCount] = useState(MOCK_ROLES.length);
+  const [roles, setRoles] = useState<any[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedRowId, setSelectedRowId] = useState<string | null>(highlightIdParam);
   
@@ -43,7 +37,6 @@ export default function CustomRolesPage() {
 
   // Modals States
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false); 
-  const [targetRole, setTargetRole] = useState<typeof MOCK_ROLES[0] | null>(null);
 
   const rowRefs = useRef<{ [key: string]: HTMLTableRowElement | null }>({});
 
@@ -56,24 +49,68 @@ export default function CustomRolesPage() {
     }
   }, [highlightIdParam, pathname, searchParams]);
 
-  const handleSearchTrigger = () => {
-    setPage(1);
-    const filtered = MOCK_ROLES.filter(r => 
-      r.roleName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      r.description.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setRoles(filtered);
-    setTotalCount(filtered.length);
+  const fetchRolesData = async (currentPage: number, searchKeyword: string = "") => {
+    setIsLoading(true);
+    try {
+      const orgId = localStorage.getItem("orgId") || "temp";
+      const currentOffset = (currentPage - 1) * itemsPerPage;
+      const payload = { offset: currentOffset, limit: itemsPerPage, fullTextSearch: searchKeyword };
+
+      const [res, countRes] = await Promise.all([
+        roleApi.getCustomRoles(orgId, payload),
+        roleApi.getCustomRoleCount(orgId, { fullTextSearch: searchKeyword })
+      ]);
+      
+      const rolesData = res?.data ? res.data : (Array.isArray(res) ? res : []);
+      setRoles(rolesData);
+      
+      let count = 0;
+      if (typeof countRes === "number") count = countRes;
+      else if (countRes && typeof countRes === "object") {
+        count = countRes.count || countRes.totalCount || countRes.data || rolesData.length; 
+      }
+      setTotalCount(count); 
+    } catch (error: any) {
+      console.error("Fetch Roles Error:", error);
+      toast.error("Failed to load roles");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleBulkDelete = () => {
-    setRoles(roles.filter(r => !selectedIds.includes(r.id)));
-    setSelectedIds([]);
-    setShowDeleteConfirm(false);
+  useEffect(() => {
+    fetchRolesData(page, searchTerm);
+  }, [page, itemsPerPage]);
+
+  const handleSearchTrigger = () => {
+    setPage(1);
+    fetchRolesData(1, searchTerm); 
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    
+    const orgId = localStorage.getItem("orgId") || "temp";
+    
+    try {
+      for (const id of selectedIds) { 
+        await roleApi.deleteCustomRoleById(orgId, id); 
+      }
+      
+      toast.success("Successfully deleted role(s).");
+      setSelectedIds([]);
+      setShowDeleteConfirm(false);
+      
+      fetchRolesData(page, searchTerm);
+    } catch (error: any) {
+      console.error("Delete custom role error:", error);
+      const errorMsg = error?.response?.data?.description || error?.message || "Failed to delete role(s)";
+      toast.error(errorMsg);
+    }
   };
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) setSelectedIds(roles.map(r => r.id));
+    if (e.target.checked) setSelectedIds(roles.map(r => r.id || r.customRoleId || r.roleId));
     else setSelectedIds([]);
   };
 
@@ -169,52 +206,48 @@ export default function CustomRolesPage() {
                           </tr>
                       </thead>
                       <tbody className="divide-y divide-blue-900/20">
-                          {roles.length === 0 ? (
+                          {isLoading ? (
+                              <tr><td colSpan={5} className="p-20 text-center text-slate-500 animate-pulse">Loading roles...</td></tr>
+                          ) : roles.length === 0 ? (
                               <tr><td colSpan={5} className="p-20 text-center text-slate-500 font-medium italic">No custom roles found.</td></tr>
                           ) : (
                               roles.map((role, idx) => {
-                                  const isSelected = selectedRowId === role.id;
+                                  const roleId = role.id || role.customRoleId || role.roleId;
+                                  const isSelected = selectedRowId === roleId;
+                                  
                                   return (
                                       <tr 
-                                          key={role.id} 
-                                          ref={(el) => { if (el) rowRefs.current[role.id] = el; }}
-                                          onClick={() => setSelectedRowId(role.id)}
+                                          key={roleId || idx} 
+                                          ref={(el) => { if (el) rowRefs.current[roleId] = el; }}
+                                          onClick={() => setSelectedRowId(roleId)}
                                           className={`transition-all duration-300 group text-sm cursor-pointer hover:bg-blue-900/10
                                             ${isSelected ? "bg-blue-900/20 border-l-4 border-l-cyan-400 pl-[12px]" : "border-l-4 border-l-transparent pl-[16px]"}
                                           `}
                                       >
                                           <td className="p-4" onClick={(e) => e.stopPropagation()}>
-                                            <input type="checkbox" checked={selectedIds.includes(role.id)} onChange={() => handleSelectOne(role.id)} className="rounded border-slate-600 bg-slate-800" />
+                                            <input type="checkbox" checked={selectedIds.includes(roleId)} onChange={() => handleSelectOne(roleId)} className="rounded border-slate-600 bg-slate-800" />
                                           </td>
                                           
                                           <td className="p-4 font-medium text-slate-200">
-                                            <Link href={`/admin/custom-roles/${role.id}/update`} className={`hover:underline ${isSelected ? 'text-cyan-400' : 'text-blue-400 hover:text-cyan-300'}`} onClick={(e) => e.stopPropagation()}>
-                                              {role.roleName}
+                                            <Link href={`/admin/custom-roles/${roleId}/update`} className={`hover:underline ${isSelected ? 'text-cyan-400' : 'text-blue-400 hover:text-cyan-300'}`} onClick={(e) => e.stopPropagation()}>
+                                              {role.customRoleName || role.roleName || role.name || "-"}
                                             </Link>
                                           </td>
 
-                                          <td className="p-4 text-slate-400 text-sm max-w-[400px] truncate">{role.description}</td>
+                                          <td className="p-4 text-slate-400 text-sm max-w-[400px] truncate">{role.roleDescription || role.description || "-"}</td>
                                           
                                           <td className="p-4">
                                               <div className="flex flex-wrap gap-1">
-                                                  {parseTags(role.tags).map((tag, i) => (
-                                                      <span key={i} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/10 text-blue-300 border border-blue-500/20 uppercase">{tag}</span>
-                                                  ))}
+                                                  {parseTags(role.tags).length > 0 ? parseTags(role.tags).map((tag, i) => (
+                                                      <span key={i} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/10 text-blue-300 border border-blue-500/20">{tag}</span>
+                                                  )) : "-"}
                                               </div>
                                           </td>
                                           
                                           <td className="p-4 text-center relative" onClick={(e) => e.stopPropagation()}>
-                                              <button onClick={() => setTargetRole(targetRole?.id === role.id ? null : role)} className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition-colors border border-transparent hover:border-slate-700">
+                                              <button onClick={() => setSelectedRowId(roleId)} className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition-colors border border-transparent hover:border-slate-700">
                                                   <MoreHorizontal className="w-4 h-4" />
                                               </button>
-
-                                              {targetRole?.id === role.id && (
-                                                  <div className="absolute right-8 top-10 bg-[#0B1120] border border-blue-900/50 shadow-xl rounded-lg w-40 z-50 p-1 flex flex-col text-left">
-                                                     <Link href={`/admin/custom-roles/${role.id}/update`} className="px-3 py-2 text-xs text-cyan-400 hover:bg-blue-900/30 rounded flex items-center gap-2 transition-all"><ShieldCheck className="w-3.5 h-3.5" /> Edit Permissions</Link>
-                                                     <div className="h-px bg-blue-900/30 my-1 mx-1"></div>
-                                                     <button onClick={() => { setTargetRole(null); setShowDeleteConfirm(true); setSelectedIds([role.id]); }} className="px-3 py-2 text-xs text-red-400 hover:bg-red-900/30 rounded flex items-center gap-2 transition-all"><Trash2 className="w-3.5 h-3.5" /> Delete Role</button>
-                                                  </div>
-                                              )}
                                           </td>
                                       </tr>
                                   );
@@ -238,8 +271,8 @@ export default function CustomRolesPage() {
                   <div className="flex items-center gap-4">
                       <div className="text-xs text-slate-400">{totalCount === 0 ? '0-0' : `${startRow}-${endRow}`} of {totalCount}</div>
                       <div className="flex items-center gap-1">
-                          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded hover:bg-blue-900/40 text-slate-400 disabled:opacity-30 transition-colors"><ChevronLeft className="w-5 h-5" /></button>
-                          <button onClick={() => setPage(p => Math.min(Math.ceil(totalCount/itemsPerPage), p + 1))} disabled={page >= Math.ceil(totalCount/itemsPerPage) || totalCount === 0} className="p-1.5 rounded hover:bg-blue-900/40 text-slate-400 disabled:opacity-30 transition-colors"><ChevronRight className="w-5 h-5" /></button>
+                          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1 || isLoading} className="p-1.5 rounded hover:bg-blue-900/40 text-slate-400 disabled:opacity-30 transition-colors"><ChevronLeft className="w-5 h-5" /></button>
+                          <button onClick={() => setPage(p => Math.min(Math.ceil(totalCount/itemsPerPage), p + 1))} disabled={page >= Math.ceil(totalCount/itemsPerPage) || totalCount === 0 || isLoading} className="p-1.5 rounded hover:bg-blue-900/40 text-slate-400 disabled:opacity-30 transition-colors"><ChevronRight className="w-5 h-5" /></button>
                       </div>
                   </div>
               </div>
@@ -256,7 +289,7 @@ export default function CustomRolesPage() {
                 <p className="text-sm text-slate-400 mb-6 font-medium leading-relaxed px-2">Are you sure you want to delete {selectedIds.length} role(s)? This action cannot be undone.</p>
                 <div className="flex gap-3">
                     <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-800 rounded-lg transition-colors border border-slate-700">Cancel</button>
-                    <button onClick={handleBulkDelete} className="flex-1 py-2.5 text-sm font-medium bg-red-600 hover:bg-red-500 text-white rounded-lg transition-all shadow-lg shadow-red-900/20 font-bold uppercase">Delete Now</button>
+                    <button onClick={handleBulkDelete} className="flex-1 py-2.5 text-sm font-medium bg-red-600 hover:bg-red-500 text-white rounded-lg transition-all shadow-lg shadow-red-900/20 font-bold uppercase">Delete</button>
                 </div>
             </div>
         </div>

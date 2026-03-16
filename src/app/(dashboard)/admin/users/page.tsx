@@ -14,16 +14,16 @@ import {
   Trash2,
   Copy,
 } from "lucide-react";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from "@/src/components/ui/dropdown-menu"; 
 import { Navbar } from "@/src/components/layout/navbar"; 
-
-// --- Mock Data สำหรับตาราง User ---
-const MOCK_USERS = [
-  { orgUserId: "u1", userName: "admin_super", userEmail: "admin@rtarf.mi.th", rolesList: "Super Admin", userStatus: "Active", isOrgInitialUser: "YES", tags: "IT,HQ", customRoleName: "System Administrator" },
-  { orgUserId: "u2", userName: "john.doe", userEmail: "john@rtarf.mi.th", rolesList: "Viewer", userStatus: "Active", isOrgInitialUser: "NO", tags: "Operator", customRoleName: "Monitor Staff" },
-  { orgUserId: "u3", userName: "sarah.connor", userEmail: "sarah@cyber.mil", rolesList: "Editor", userStatus: "Pending", isOrgInitialUser: "NO", tags: "Cyber", customRoleName: "Threat Analyst" },
-  { orgUserId: "u4", userName: "mike.w", userEmail: "mike@gmail.com", rolesList: "Viewer", userStatus: "Disabled", isOrgInitialUser: "NO", tags: "Guest", customRoleName: null },
-  { orgUserId: "u5", userName: "root_system", userEmail: "root@localhost", rolesList: "Super Admin", userStatus: "Active", isOrgInitialUser: "YES", tags: "System", customRoleName: "Root" },
-];
+import { toast } from "sonner"; 
+import { userApi } from "@/src/modules/auth/api/user.api";
+import { UserItem } from "@/src/modules/auth/api/types";
 
 export default function UsersPage() {
   const pathname = usePathname(); 
@@ -31,8 +31,10 @@ export default function UsersPage() {
   const highlightIdParam = searchParams.get("highlight");
 
   // States
-  const [users, setUsers] = useState(MOCK_USERS);
-  const [totalCount, setTotalCount] = useState(MOCK_USERS.length);
+  const [users, setUsers] = useState<UserItem[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedRowId, setSelectedRowId] = useState<string | null>(highlightIdParam);
   
@@ -45,9 +47,42 @@ export default function UsersPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false); 
   const [showResetLinkModal, setShowResetLinkModal] = useState(false);
   const [generatedLink, setGeneratedLink] = useState("");
-  const [targetUser, setTargetUser] = useState<typeof MOCK_USERS[0] | null>(null);
+  const [targetUser, setTargetUser] = useState<UserItem | null>(null);
 
   const rowRefs = useRef<{ [key: string]: HTMLTableRowElement | null }>({});
+
+  const fetchUsersData = async (currentPage: number, searchKeyword: string = "") => {
+    setIsLoading(true);
+    try {
+      const orgId = localStorage.getItem("orgId") || "temp";
+      const currentOffset = (currentPage - 1) * itemsPerPage;
+      const payload = { offset: currentOffset, limit: itemsPerPage, fullTextSearch: searchKeyword };
+
+      const [res, countRes] = await Promise.all([
+        userApi.getUsers(orgId, payload),
+        userApi.getUserCount(orgId, { fullTextSearch: searchKeyword })
+      ]);
+      
+      const userData = res?.data ? res.data : (Array.isArray(res) ? res : []);
+      setUsers(userData);
+      
+      let count = 0;
+      if (typeof countRes === "number") count = countRes;
+      else if (countRes && typeof countRes === "object") {
+        count = countRes.count || countRes.totalCount || countRes.data || userData.length; 
+      }
+      setTotalCount(count); 
+    } catch (error: any) {
+      console.error("Fetch Users Error:", error);
+      toast.error("Failed to load users");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsersData(page, searchTerm);
+  }, [page, itemsPerPage]);
 
   useEffect(() => {
     if (highlightIdParam) {
@@ -58,52 +93,72 @@ export default function UsersPage() {
     }
   }, [highlightIdParam, pathname, searchParams]);
 
-  // --- Mock Functions ---
   const handleSearchTrigger = () => {
-    setPage(1);
-    const filtered = MOCK_USERS.filter(u => 
-      u.userName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      (u.userEmail && u.userEmail.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
-    setUsers(filtered);
-    setTotalCount(filtered.length);
+    setPage(1); 
+    fetchUsersData(1, searchTerm);
   };
 
-  const handleBulkDelete = () => {
-    const remainingUsers = users.filter(u => !selectedIds.includes(u.orgUserId));
-    setUsers(remainingUsers);
-    setTotalCount(remainingUsers.length);
-    setSelectedIds([]);
-    setShowDeleteConfirm(false);
-    alert(`Successfully deleted ${selectedIds.length} user(s). (Mock)`);
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+
+    const orgId = localStorage.getItem("orgId") || "temp";
+    
+    try {
+      for (const id of selectedIds) { 
+        await userApi.deleteUser(orgId, id); 
+      }
+      
+      toast.success("Successfully deleted user(s).");
+      setSelectedIds([]);
+      setShowDeleteConfirm(false);
+      fetchUsersData(page, searchTerm);
+
+    } catch (error: any) {
+      console.error("Delete users error:", error);
+      const errorMsg = error?.response?.data?.description || error?.message || "Failed to delete users.";
+      toast.error(errorMsg);
+    }
   };
 
-  const handleToggleStatus = () => {
+  const handleToggleStatus = async () => {
     if (!targetUser) return;
-    const newStatus = targetUser.userStatus === "Disabled" ? "Active" : "Disabled";
-    setUsers(users.map(u => u.orgUserId === targetUser.orgUserId ? { ...u, userStatus: newStatus } : u));
-    setShowStatusConfirm(false);
-    setTargetUser(null);
+    
+    const orgId = localStorage.getItem("orgId") || "temp";
+    const userId = targetUser.orgUserId;
+    const isCurrentlyDisabled = targetUser.userStatus === "Disabled";
+
+    const toastId = toast.loading(isCurrentlyDisabled ? "Enabling user..." : "Disabling user...");
+
+    try {
+      if (isCurrentlyDisabled) {
+        await userApi.enableUserById(orgId, userId);
+        toast.success("User enabled successfully", { id: toastId });
+      } else {
+        await userApi.disableUserById(orgId, userId);
+        toast.success("User disabled successfully", { id: toastId });
+      }
+      
+      setShowStatusConfirm(false);
+      setTargetUser(null);
+      fetchUsersData(page, searchTerm); 
+    } catch (error: any) {
+      console.error("Toggle status error:", error);
+      const errorMsg = error?.response?.data?.description || "Failed to update user status";
+      toast.error(errorMsg, { id: toastId });
+    }
   };
 
-  const handleResetPasswordLink = (user: typeof MOCK_USERS[0]) => {
-    if (user.userStatus !== "Active") return;
-    setTargetUser(user);
+  const handleResetPasswordLink = (user: UserItem) => {
     setGeneratedLink(`https://please-protect.center/reset?token=mock_${Math.random().toString(36).substr(2, 9)}`);
     setShowResetLinkModal(true);
   };
 
   const copyToClipboard = async () => {
-    if (!generatedLink) return;
-    try {
-      await navigator.clipboard.writeText(generatedLink);
-      alert("Link copied to clipboard!");
-    } catch (err) {
-      alert("Failed to copy link.");
-    }
+    await navigator.clipboard.writeText(generatedLink);
+    toast.success("Link copied to clipboard!");
   };
 
-  const handleActionClick = (user: typeof MOCK_USERS[0]) => {
+  const handleActionClick = (user: UserItem) => {
     setTargetUser(user);
     setShowStatusConfirm(true);
   };
@@ -117,82 +172,57 @@ export default function UsersPage() {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
-  const parseTags = (tags: string | null | undefined) => {
-    if (!tags) return [];
-    return tags.split(',').filter(t => t.trim() !== '');
-  };
-
   const totalPages = Math.ceil(totalCount / itemsPerPage);
   const startRow = totalCount === 0 ? 0 : (page - 1) * itemsPerPage + 1;
   const endRow = Math.min(page * itemsPerPage, totalCount);
 
   return (
     <div className="flex flex-col h-screen bg-[#020617] text-slate-200 font-sans overflow-hidden">
-      
       <Navbar />
 
-      {/* Main Content */}
       <main className="flex-1 flex flex-col relative overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
         
-        {/* Header */}
         <div className="flex-none pt-6 px-4 md:px-6 mb-2">
-          <div className="flex items-center gap-4">
-              <div>
-                  <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">User Management</h1>
-                  <p className="text-slate-400 text-xs md:text-sm">Manage users, roles, and access permissions for the center.</p>
-              </div>
-          </div>
+            <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">User Management</h1>
+            <p className="text-slate-400 text-xs md:text-sm">Manage users, roles, and access permissions for the center.</p>
         </div>
 
-        {/* Toolbar */}
         <div className="flex-none py-4">
           <div className="flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center bg-[#0B1120] p-4 rounded-xl border border-blue-900/30 shadow-lg">
               <div className="flex flex-col sm:flex-row w-full lg:w-auto gap-2">
-                  <div className="relative w-full sm:w-auto sm:min-w-[160px]">
-                      <select className="w-full appearance-none bg-[#162032] border border-blue-900/50 text-slate-300 text-sm rounded-lg pl-3 pr-8 py-2.5 focus:outline-none focus:border-cyan-500 transition-colors">
+                  <div className="relative">
+                      <select className="appearance-none bg-[#162032] border border-blue-900/50 text-slate-300 text-sm rounded-lg pl-3 pr-8 py-2.5 focus:outline-none transition-colors">
                           <option>All Fields</option>
-                          <option>Username</option>
-                          <option>Email</option>
                       </select>
-                      <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3 top-3 pointer-events-none" />
+                      <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3 top-3.5 pointer-events-none" />
                   </div>
-                  <div className="relative w-full sm:w-auto sm:flex-1 lg:min-w-[240px]">
+                  <div className="relative flex-1 lg:min-w-[240px]">
                       <input 
                         type="text" 
                         placeholder="Search users..." 
                         value={searchTerm}                         
                         onChange={(e) => setSearchTerm(e.target.value)} 
-                        onKeyDown={(e) => e.key === "Enter" && handleSearchTrigger()}
-                        className="w-full bg-[#162032] border border-blue-900/50 text-slate-200 text-sm rounded-lg pl-3 pr-10 py-2.5 focus:outline-none focus:border-cyan-500 placeholder:text-slate-500 transition-colors" 
+                        onKeyDown={(e) => e.key === "Enter" && fetchUsersData(1, searchTerm)}
+                        className="w-full bg-[#162032] border border-blue-900/50 text-slate-200 text-sm rounded-lg pl-3 pr-10 py-2.5 focus:outline-none focus:border-cyan-500 transition-colors" 
                       />
                   </div>
-                  <button 
-                    onClick={handleSearchTrigger} 
-                    className="w-full sm:w-auto px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-all flex items-center justify-center gap-2"
-                  >
+                  <button onClick={() => fetchUsersData(1, searchTerm)} className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg flex items-center justify-center">
                     <Search className="w-4 h-4" />
                   </button>
               </div>
 
               <div className="flex gap-2 w-full lg:w-auto justify-end">
-                  <Link 
-                    href={selectedRowId ? `/admin/users/create?prevHighlight=${selectedRowId}` : "/admin/users/create"} 
-                    className="flex-1 lg:flex-none"
-                  >
-                      <button className="w-full justify-center px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg uppercase transition-all shadow-lg shadow-cyan-900/20">Add</button>
+                  <Link href="/admin/users/create">
+                      <button className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg uppercase shadow-lg">Add</button>
                   </Link>
-                  <button 
-                    onClick={() => setShowDeleteConfirm(true)}
-                    disabled={selectedIds.length === 0}
-                    className="flex-1 lg:flex-none justify-center px-6 py-2.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/50 text-sm font-semibold rounded-lg uppercase transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
+                  <button onClick={() => setShowDeleteConfirm(true)} disabled={selectedIds.length === 0} className="px-6 py-2.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/50 text-sm font-semibold rounded-lg uppercase disabled:opacity-30">
                       Delete
                   </button>
               </div>
           </div>
         </div>
 
-        {/* Table */}
+        {/* table */}
         <div className="flex-1 overflow-hidden flex flex-col min-h-0">
           <div className="flex-1 bg-[#0B1120] border border-blue-900/30 rounded-xl shadow-2xl overflow-hidden flex flex-col">
               <div className="flex-1 overflow-auto custom-scrollbar">
@@ -211,74 +241,69 @@ export default function UsersPage() {
                           </tr>
                       </thead>
                       <tbody className="divide-y divide-blue-900/20">
-                          {users.length === 0 ? (
-                              <tr><td colSpan={9} className="p-20 text-center text-slate-500">No users found.</td></tr>
+                          {isLoading ? (
+                              <tr><td colSpan={9} className="p-20 text-center text-slate-500 animate-pulse">Loading users...</td></tr>
                           ) : (
                               users.map((user, idx) => {
-                                  const isSelected = selectedRowId === user.orgUserId;
+                                  const userId = user.orgUserId; 
+                                  const isSelected = selectedRowId === userId;
                                   const isPending = user.userStatus === "Pending"; 
+                                  const tagsArray = user.tags ? user.tags.split(',').filter(t => t.trim() !== '') : [];
 
                                   return (
                                       <tr 
-                                          key={user.orgUserId || idx} 
-                                          ref={(el) => { if (el) rowRefs.current[user.orgUserId] = el; }}
-                                          onClick={() => setSelectedRowId(user.orgUserId)}
-                                          className={`transition-all duration-300 group text-sm cursor-pointer hover:bg-blue-900/10
-                                            ${isSelected ? "bg-blue-900/20 border-l-4 border-l-cyan-400 pl-[12px]" : "border-l-4 border-l-transparent pl-[16px]"}
-                                          `}
+                                          key={userId || idx} 
+                                          onClick={() => setSelectedRowId(userId)}
+                                          className={`transition-all duration-300 group text-sm cursor-pointer hover:bg-blue-900/10 ${isSelected ? "bg-blue-900/20 border-l-4 border-l-cyan-400" : "border-l-4 border-l-transparent"}`}
                                       >
                                           <td className="p-4" onClick={(e) => e.stopPropagation()}>
-                                            <input type="checkbox" checked={selectedIds.includes(user.orgUserId)} onChange={() => handleSelectOne(user.orgUserId)} className="rounded border-slate-600 bg-slate-800" />
+                                            <input type="checkbox" checked={selectedIds.includes(userId)} onChange={() => handleSelectOne(userId)} className="rounded border-slate-600 bg-slate-800" />
                                           </td>
-                                          
-                                          <td className="p-4 font-medium">
-                                            <Link href={`/admin/users/${user.orgUserId}/update`} className={`hover:underline ${isSelected ? 'text-cyan-400' : 'text-blue-400 hover:text-cyan-300'}`} onClick={(e) => e.stopPropagation()}>
-                                              {user.userName}
-                                            </Link>
-                                          </td>
-
-                                          <td className="p-4 text-slate-300">{user.userEmail || "-"}</td>
-                                          
-                                          <td className="p-4">
-                                              <div className="flex flex-wrap gap-1">
-                                                  {parseTags(user.tags).map((tag, i) => (
-                                                      <span key={i} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/10 text-blue-300 border border-blue-500/20">{tag}</span>
-                                                  ))}
-                                              </div>
-                                          </td>
-                                          
+                                          <td className="p-4 font-medium"><Link href={`/admin/users/${userId}/update`} className="text-blue-400 hover:underline" onClick={(e) => e.stopPropagation()}>{user.userName}</Link></td>
+                                          <td className="p-4 text-slate-300">{user.userEmail || user.tmpUserEmail || "-"}</td>
+                                          <td className="p-4"><div className="flex flex-wrap gap-1">{tagsArray.map((tag, i) => (
+                                              <span key={i} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/10 text-blue-300 border border-blue-500/20">{tag}</span>
+                                          ))}</div></td>
                                           <td className="p-4 text-slate-400">{user.customRoleName || "-"}</td>
+                                          <td className="p-4"><span className="bg-blue-600 px-2 py-1 rounded-md text-[10px] font-semibold text-white">{user.rolesList || "-"}</span></td>
+                                          <td className="p-4 text-center">{user.isOrgInitialUser === "YES" ? <Check className="w-4 h-4 text-emerald-400 mx-auto" /> : <X className="w-4 h-4 text-slate-600 mx-auto" />}</td>
+                                          <td className="p-4 font-medium"><span className={user.userStatus === 'Disabled' ? 'text-slate-500' : 'text-emerald-400'}>{user.userStatus || "Active"}</span></td>
                                           
-                                          <td className="p-4">
-                                              <span className="bg-blue-600 px-2 py-1 rounded-md text-[10px] font-semibold text-white">{user.rolesList}</span>
-                                          </td>
-                                          
-                                          <td className="p-4 text-center">{user.isOrgInitialUser === "YES" ? <Check className="w-4 h-4 text-emerald-400 mx-auto" /> : <X className="w-4 h-4 text-red-400 mx-auto" />}</td>
-                                          
-                                          <td className="p-4 font-medium">
-                                              <span className={user.userStatus === 'Disabled' ? 'text-slate-500' : user.userStatus === 'Pending' ? 'text-amber-400' : 'text-emerald-400'}>
-                                                {user.userStatus}
-                                              </span>
-                                          </td>
-                                          
-                                          <td className="p-4 text-center relative" onClick={(e) => e.stopPropagation()}>
-                                              <button 
-                                                onClick={() => setTargetUser(user)} 
-                                                className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition-colors border border-transparent hover:border-slate-700"
-                                              >
-                                                  <MoreHorizontal className="w-4 h-4" />
-                                              </button>
+                                          <td className="p-4 text-center" onClick={(e) => e.stopPropagation()}>
+                                              <DropdownMenu modal={false}>
+                                                <DropdownMenuTrigger asChild>
+                                                  <button className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition-colors border border-transparent hover:border-slate-700 outline-none">
+                                                    <MoreHorizontal className="w-4 h-4" />
+                                                  </button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end" className="bg-[#0B1120] border border-blue-900/50 text-slate-200 min-w-[180px] p-1 shadow-2xl z-[100]">
+                                                  
+                                                  <DropdownMenuItem 
+                                                    disabled={user.userStatus === "Disabled" || isPending}
+                                                    onClick={() => handleActionClick(user)}
+                                                    className="cursor-pointer focus:bg-white/5 focus:text-[#f87171] text-[#f87171] px-3 py-2 text-sm rounded-md outline-none"
+                                                  >
+                                                    Disable User
+                                                  </DropdownMenuItem>
 
-                                              {/* Mock Dropdown */}
-                                              {targetUser?.orgUserId === user.orgUserId && !showStatusConfirm && !showResetLinkModal && (
-                                                  <div className="absolute right-8 top-10 bg-[#0B1120] border border-blue-900/50 shadow-xl rounded-lg w-40 z-50 p-1 flex flex-col text-left">
-                                                     <button disabled={user.userStatus === "Disabled" || isPending} onClick={() => handleActionClick(user)} className="px-3 py-2 text-sm text-red-400 hover:bg-blue-900/30 rounded disabled:opacity-30">Disable User</button>
-                                                     <button disabled={user.userStatus !== "Disabled" || isPending} onClick={() => handleActionClick(user)} className="px-3 py-2 text-sm text-emerald-400 hover:bg-blue-900/30 rounded disabled:opacity-30">Enable User</button>
-                                                     <button disabled={user.userStatus !== "Active"} onClick={() => handleResetPasswordLink(user)} className="px-3 py-2 text-sm text-cyan-400 hover:bg-blue-900/30 rounded disabled:opacity-30">Reset Password</button>
-                                                     <div className="h-px bg-blue-900/30 my-1"></div>
-                                                     <button onClick={() => setTargetUser(null)} className="px-3 py-2 text-sm text-slate-400 hover:bg-slate-800 rounded">Cancel</button>
-                                                  </div>
-                                              )}
+                                                  <DropdownMenuItem 
+                                                    disabled={user.userStatus !== "Disabled" || isPending}
+                                                    onClick={() => handleActionClick(user)}
+                                                    className="cursor-pointer focus:bg-white/5 focus:text-slate-300 text-slate-300 px-3 py-2 text-sm rounded-md outline-none"
+                                                  >
+                                                    Enable User
+                                                  </DropdownMenuItem>
+                                                  
+                                                  <DropdownMenuItem 
+                                                    disabled={user.userStatus !== "Active"}
+                                                    onClick={() => handleResetPasswordLink(user)}
+                                                    className="cursor-pointer focus:bg-white/5 focus:text-[#2dd4bf] text-[#2dd4bf] px-3 py-2 text-sm rounded-md outline-none"
+                                                  >
+                                                    Reset Password Link
+                                                  </DropdownMenuItem>
+
+                                                </DropdownMenuContent>
+                                              </DropdownMenu>
                                           </td>
                                       </tr>
                                   );
@@ -288,21 +313,19 @@ export default function UsersPage() {
                   </table>
               </div>
               
-              <div className="flex-none flex items-center justify-between sm:justify-end px-6 py-4 border-t border-blue-900/50 bg-[#020617] z-20 gap-4 sm:gap-6">
+              <div className="flex-none flex items-center justify-between sm:justify-end px-6 py-4 border-t border-blue-900/50 bg-[#020617] z-20 gap-6">
                   <div className="flex items-center gap-2 text-sm text-slate-400">
                       <span>Rows per page</span>
                       <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setPage(1); }} className="bg-transparent border-none text-slate-200 focus:ring-0 cursor-pointer font-medium outline-none">
                           <option value={25} className="bg-slate-900">25</option>
                           <option value={50} className="bg-slate-900">50</option>
-                          <option value={100} className="bg-slate-900">100</option>
-                          <option value={200} className="bg-slate-900">200</option>
                       </select>
                   </div>
-                  <div className="flex items-center gap-4">
-                      <div className="text-xs text-slate-400">{totalCount === 0 ? '0-0' : `${startRow}-${endRow}`} of {totalCount}</div>
+                  <div className="flex items-center gap-4 text-xs text-slate-400 font-bold">
+                      <div>{startRow}-{endRow} of {totalCount}</div>
                       <div className="flex items-center gap-1">
-                          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded hover:bg-blue-900/40 text-slate-400 disabled:opacity-30 transition-colors"><ChevronLeft className="w-5 h-5" /></button>
-                          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || totalPages === 0} className="p-1.5 rounded hover:bg-blue-900/40 text-slate-400 disabled:opacity-30 transition-colors"><ChevronRight className="w-5 h-5" /></button>
+                          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded hover:bg-blue-900/40 disabled:opacity-30 transition-colors"><ChevronLeft className="w-5 h-5" /></button>
+                          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || totalPages === 0} className="p-1.5 rounded hover:bg-blue-900/40 disabled:opacity-30 transition-colors"><ChevronRight className="w-5 h-5" /></button>
                       </div>
                   </div>
               </div>
@@ -310,65 +333,50 @@ export default function UsersPage() {
         </div>
       </main>
 
-      {/* Enable/Disable Modal */}
+      {/* Confirmation Modals */}
       {showStatusConfirm && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="bg-[#0B1120] border border-blue-900/50 rounded-xl shadow-2xl w-full max-w-sm p-6">
-                <div className="flex flex-col items-center text-center">
-                    <h3 className="text-lg font-bold text-white mb-2">
-                        {targetUser?.userStatus === "Disabled" ? "Enable User" : "Disable User"}
-                    </h3>
-                    <p className="text-sm text-slate-400 mb-6">
-                        Are you sure you want to {targetUser?.userStatus === "Disabled" ? "enable" : "disable"} this user?
-                    </p>
-                    <div className="flex justify-end gap-3 w-full">
-                        <button onClick={() => { setShowStatusConfirm(false); setTargetUser(null); }} className="flex-1 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 rounded-lg transition-colors border border-slate-700">Cancel</button>
-                        <button onClick={handleToggleStatus} className={`flex-1 px-4 py-2 text-sm font-medium text-white rounded-lg transition-all ${targetUser?.userStatus === "Disabled" ? "bg-emerald-600 hover:bg-emerald-500" : "bg-red-600 hover:bg-red-500"}`}>
-                            Confirm
-                        </button>
-                    </div>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-[#0B1120] border border-blue-900/50 rounded-xl shadow-2xl w-full max-w-sm p-6 text-center animate-in zoom-in-95">
+                <h3 className="text-lg font-bold text-white mb-2">
+                    {targetUser?.userStatus === "Disabled" ? "Enable User" : "Disable User"}
+                </h3>
+                <p className="text-sm text-slate-400 mb-6">
+                    Are you sure you want to {targetUser?.userStatus === "Disabled" ? "enable" : "disable"} this user?
+                </p>
+                <div className="flex gap-3">
+                    <button onClick={() => { setShowStatusConfirm(false); setTargetUser(null); }} className="flex-1 px-4 py-2 text-sm font-medium text-slate-300 bg-slate-800 rounded-lg border border-slate-700 transition-colors">Cancel</button>
+                    <button onClick={handleToggleStatus} className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg shadow-lg hover:bg-blue-500 transition-all">Confirm</button>
                 </div>
             </div>
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="bg-[#0B1120] border border-blue-900/50 rounded-xl shadow-2xl w-full max-w-sm p-6">
-                <div className="flex flex-col items-center text-center">
-                    <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center mb-4 border border-red-500/20">
-                        <Trash2 className="w-6 h-6 text-red-500" />
-                    </div>
-                    <h3 className="text-lg font-bold text-white mb-2">Delete Users</h3>
-                    <p className="text-sm text-slate-400 mb-6">Are you sure you want to delete {selectedIds.length} selected user(s)? This action cannot be undone.</p>
-                    <div className="flex justify-end gap-3 w-full">
-                        <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 rounded-lg transition-colors border border-slate-700">Cancel</button>
-                        <button onClick={handleBulkDelete} className="flex-1 px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-500 text-white rounded-lg transition-all">Delete</button>
-                    </div>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-[#0B1120] border border-blue-900/50 rounded-xl shadow-2xl w-full max-w-sm p-6 text-center animate-in zoom-in-95">
+                <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center mb-4 border border-red-500/20 mx-auto"><Trash2 className="w-6 h-6 text-red-500" /></div>
+                <h3 className="text-lg font-bold text-white mb-2">Delete Users</h3>
+                <p className="text-sm text-slate-400 mb-6">Are you sure you want to delete {selectedIds.length} selected user(s)?</p>
+                <div className="flex gap-3">
+                    <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 px-4 py-2 text-sm font-medium text-slate-300 bg-slate-800 rounded-lg border border-slate-700">Cancel</button>
+                    <button onClick={handleBulkDelete} className="flex-1 px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg shadow-lg hover:bg-red-500 transition-all">Delete</button>
                 </div>
             </div>
         </div>
       )}
 
-      {/* Reset Link Modal */}
       {showResetLinkModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="bg-[#0B1120] border border-blue-900/50 rounded-xl shadow-2xl w-full max-w-md p-6">
-                <div className="flex flex-col gap-4">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-bold text-white">Password Reset Link</h3>
-                        <button onClick={() => setShowResetLinkModal(false)} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
-                    </div>
-                    <p className="text-sm text-slate-400">Copy the link below and send it to <strong>{targetUser?.userName}</strong></p>
-                    <div className="relative">
-                        <input type="text" readOnly value={generatedLink} className="w-full bg-[#162032] border border-blue-900/50 text-cyan-400 text-sm rounded-lg pl-3 pr-12 py-3 focus:outline-none" />
-                        <button onClick={copyToClipboard} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-blue-900/30 rounded-md text-slate-400 hover:text-cyan-400 transition-colors" title="Copy"><Copy className="w-4 h-4" /></button>
-                    </div>
-                    <div className="flex justify-end pt-2">
-                        <button onClick={() => setShowResetLinkModal(false)} className="px-6 py-2 text-sm font-medium bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg transition-colors">Done</button>
-                    </div>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-[#0B1120] border border-blue-900/50 rounded-xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-bold text-white uppercase tracking-wider">Reset Password</h3>
+                    <button onClick={() => setShowResetLinkModal(false)}><X className="w-5 h-5 text-slate-500 hover:text-white transition-colors" /></button>
                 </div>
+                <div className="relative mb-6">
+                    <input type="text" readOnly value={generatedLink} className="w-full bg-[#020617] border border-blue-900/50 text-cyan-400 text-xs rounded-md pl-3 pr-10 py-3 outline-none focus:border-cyan-500 transition-colors" />
+                    <button onClick={copyToClipboard} className="absolute right-2 top-2.5 p-1 text-slate-500 hover:text-cyan-400 transition-colors"><Copy className="w-4 h-4" /></button>
+                </div>
+                <button onClick={() => setShowResetLinkModal(false)} className="w-full py-2.5 bg-blue-600 text-white font-bold rounded-md uppercase text-sm hover:bg-blue-500 transition-all shadow-lg">Done</button>
             </div>
         </div>
       )}

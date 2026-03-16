@@ -12,6 +12,10 @@ import {
   AlertTriangle
 } from "lucide-react";
 import { Navbar } from "@/src/components/layout/navbar";
+import { toast } from "sonner"; 
+
+import { roleApi } from "@/src/modules/auth/api/role.api";
+import { userApi } from "@/src/modules/auth/api/user.api";
 
 interface RoleItem {
   id: string;
@@ -19,40 +23,14 @@ interface RoleItem {
   desc?: string; 
 }
 
-// --- Mock Data ---
-const MOCK_SYSTEM_ROLES = [
-  { id: "sr1", name: "Super Admin", desc: "Full system access, manage all modules and users." },
-  { id: "sr2", name: "Security Analyst", desc: "Monitor security events and manage threat detection." },
-  { id: "sr3", name: "Threat Hunter", desc: "Search for cyber threats and investigate incidents." },
-  { id: "sr4", name: "Viewer", desc: "Read-only access to dashboards and reports." },
-  { id: "sr5", name: "Editor", desc: "Can edit configurations but cannot manage users." },
-];
-
-const MOCK_CUSTOM_ROLES = [
-  { id: "cr1", name: "System Administrator", desc: "IT admin full access" },
-  { id: "cr2", name: "SOC Analyst Level 1", desc: "Basic monitoring" },
-  { id: "cr3", name: "Guest Viewer", desc: "External viewer" },
-];
-
-const MOCK_USER_DATA = {
-  orgUserId: "u1",
-  userName: "admin_super",
-  userEmail: "admin@rtarf.mi.th",
-  tags: "IT,HQ,Admin",
-  customRoleId: "cr1",
-  roles: ["Super Admin", "Editor"]
-};
-
 export default function UpdateUserPage() {
   const router = useRouter();
   const params = useParams();
   const userId = params?.id as string;
 
-  // --- Loading States ---
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // --- Form State ---
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -62,10 +40,7 @@ export default function UpdateUserPage() {
 
   const [tagInput, setTagInput] = useState("");
 
-  // --- Roles State ---
   const [customRolesList, setCustomRolesList] = useState<RoleItem[]>([]);
-  
-  // --- Transfer List State ---
   const [leftRoles, setLeftRoles] = useState<RoleItem[]>([]);  
   const [rightRoles, setRightRoles] = useState<RoleItem[]>([]); 
   const [checkedLeft, setCheckedLeft] = useState<string[]>([]);
@@ -74,31 +49,61 @@ export default function UpdateUserPage() {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [showExitDialog, setShowExitDialog] = useState(false);
 
-  // --- Fetch Mock Data ---
+  const [originalData, setOriginalData] = useState({ tags: "", customRole: "", roles: "" });
+
   useEffect(() => {
     const initData = async () => {
       if (!userId) return;
       try {
         setIsLoadingData(true);
-        await new Promise(resolve => setTimeout(resolve, 600));
+        const orgId = localStorage.getItem("orgId") || "temp";
 
-        setCustomRolesList(MOCK_CUSTOM_ROLES);
+        const [rolesRes, customRolesRes, userRes] = await Promise.all([
+          roleApi.getRoles(orgId, { limit: 100 }),
+          roleApi.getCustomRoles(orgId, { limit: 100 }),
+          userApi.getUserById(orgId, userId)
+        ]);
+
+        const sysRoles = rolesRes?.data || rolesRes || [];
+        const allRolesMap: RoleItem[] = sysRoles.map((r: any) => ({
+          id: r.roleId || r.id, 
+          name: r.roleName || r.name,
+          desc: r.roleDescription || r.description
+        }));
+
+        const cusRoles = customRolesRes?.data || customRolesRes || [];
+        setCustomRolesList(cusRoles.map((cr: any) => ({
+          id: cr.customRoleId || cr.roleId || cr.id,
+          name: cr.customRoleName || cr.roleName || cr.name
+        })));
+
+        const userData = userRes?.orgUser || {};
+        const userTags = userData.tags ? userData.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [];
+        const userRolesList = userData.rolesList ? userData.rolesList.split(',').map((r: string) => r.trim()).filter(Boolean) : [];
+        const currentEmail = userData.userEmail || userData.tmpUserEmail || "";
 
         setFormData({
-            username: MOCK_USER_DATA.userName,
-            email: MOCK_USER_DATA.userEmail, 
-            tags: MOCK_USER_DATA.tags.split(',').filter(t => t.trim() !== ""),
-            customRole: MOCK_USER_DATA.customRoleId
+          username: userData.userName || "",
+          email: currentEmail,
+          tags: userTags,
+          customRole: userData.customRoleId || "",
         });
 
-        const selectedRoles = MOCK_SYSTEM_ROLES.filter(r => MOCK_USER_DATA.roles.includes(r.name));
-        const availableRoles = MOCK_SYSTEM_ROLES.filter(r => !MOCK_USER_DATA.roles.includes(r.name));
+        setOriginalData({
+          tags: userTags.slice().sort().join(','),
+          customRole: userData.customRoleId || "",
+          roles: userRolesList.slice().sort().join(',')
+        });
 
-        setRightRoles(selectedRoles);
-        setLeftRoles(availableRoles);
+        const initialRightRoles = allRolesMap.filter(r => userRolesList.includes(r.name));
+        const initialLeftRoles = allRolesMap.filter(r => !userRolesList.includes(r.name));
 
-      } catch (error) {
+        setRightRoles(initialRightRoles);
+        setLeftRoles(initialLeftRoles);
+
+      } catch (error: any) {
         console.error("Failed to load user data:", error);
+        toast.error("Failed to load user data from server");
       } finally {
         setIsLoadingData(false);
       }
@@ -109,17 +114,14 @@ export default function UpdateUserPage() {
 
   // --- Helper: Check Dirty State ---
   const checkIsDirty = () => {
-    const originalTags = MOCK_USER_DATA.tags.split(',').filter(t => t.trim() !== "").sort().join(',');
     const currentTags = formData.tags.slice().sort().join(',');
-    if (originalTags !== currentTags) return true;
+    if (originalData.tags !== currentTags) return true;
     if (tagInput.trim() !== "") return true;
 
-    if (formData.customRole !== MOCK_USER_DATA.customRoleId) return true;
+    if (formData.customRole !== originalData.customRole) return true;
 
-    const originalRoleIdsStr = MOCK_USER_DATA.roles.slice().sort().join(',');
     const currentRoleIdsStr = rightRoles.map(r => r.name).slice().sort().join(',');
-    
-    if (originalRoleIdsStr !== currentRoleIdsStr) return true;
+    if (originalData.roles !== currentRoleIdsStr) return true;
 
     return false;
   };
@@ -176,7 +178,6 @@ export default function UpdateUserPage() {
     }
 
     const newErrors: { [key: string]: string } = {};
-    if (finalTags.length === 0) newErrors.tags = "At least one tag is required";
     setErrors(newErrors);
 
     if (Object.keys(newErrors).length > 0) return;
@@ -188,11 +189,28 @@ export default function UpdateUserPage() {
 
     setIsSubmitting(true);
     
-    setTimeout(() => {
-        setIsSubmitting(false);
-        alert("User Updated Successfully (Mock)");
-        router.push(`/admin/users?highlight=${userId}`);
-    }, 1000);
+    try {
+      const orgId = localStorage.getItem("orgId") || "temp";
+      
+      const payload = {
+        userName: formData.username,
+        userEmail: formData.email, 
+        tags: finalTags.join(","),
+        customRoleId: formData.customRole ? formData.customRole : null, 
+        roles: rightRoles.map(r => r.name),
+      };
+
+      await userApi.updateUserById(orgId, userId, payload);
+      
+      toast.success("User updated successfully!");
+      router.push(`/admin/users?highlight=${userId}`);
+      
+    } catch (error: any) {
+      console.error("Update User Error:", error);
+      toast.error(error?.response?.data?.message || "Failed to update user.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (isLoadingData) {
@@ -238,14 +256,12 @@ export default function UpdateUserPage() {
       <div className="flex-1 overflow-y-auto pb-8 custom-scrollbar">
         <div className="px-4 md:px-8 space-y-6 w-full"> 
             
-            {/* 1. User Information Section */}
             <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 shadow-sm">
                 <h2 className="text-base font-semibold text-white mb-6 flex items-center gap-2 border-b border-slate-800 pb-3">
                     <span className="w-1 h-5 bg-blue-500 rounded-full"></span>
                     User Information
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Username - Disabled */}
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-slate-400">
                             Username <span className="text-red-400">*</span>
@@ -258,7 +274,6 @@ export default function UpdateUserPage() {
                         />
                     </div>
 
-                    {/* Email - Disabled */}
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-slate-400">
                             Email <span className="text-red-400">*</span>
@@ -266,15 +281,15 @@ export default function UpdateUserPage() {
                         <input 
                             type="text" 
                             value={formData.email}
-                            disabled 
+                            disabled
                             className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-500 outline-none cursor-default opacity-75 text-sm font-mono"
                         />
                     </div>
                 </div>
                 
                 <div className="space-y-2 mt-6">
-                    <label className="text-sm font-medium text-slate-300">Tags <span className="text-red-400">*</span></label>
-                    <div className={`w-full bg-slate-950 border ${errors.tags ? 'border-red-500/50' : 'border-slate-700 focus-within:border-blue-500'} rounded-lg px-3 py-2 min-h-[46px] flex flex-wrap gap-2 items-center transition-all`}>
+                    <label className="text-sm font-medium text-slate-300">Tags</label>
+                    <div className={`w-full bg-slate-950 border border-slate-700 focus-within:border-blue-500 rounded-lg px-3 py-2 min-h-[46px] flex flex-wrap gap-2 items-center transition-all`}>
                         {formData.tags.map(tag => (
                             <span key={tag} className="bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium px-2.5 py-1 rounded-full flex items-center gap-1.5 animate-in fade-in zoom-in duration-200">
                                 {tag}
@@ -287,11 +302,9 @@ export default function UpdateUserPage() {
                             className="bg-transparent outline-none text-slate-200 flex-1 min-w-[150px] text-sm placeholder:text-slate-600 h-full py-1"
                         />
                     </div>
-                    {errors.tags && <p className="text-red-400 text-xs">{errors.tags}</p>}
                 </div>
             </div>
 
-            {/* 2. Roles & Permissions Section */}
             <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 shadow-sm">
                 <h2 className="text-base font-semibold text-white mb-6 flex items-center gap-2 border-b border-slate-800 pb-3">
                     <span className="w-1 h-5 bg-purple-500 rounded-full"></span>
@@ -307,8 +320,8 @@ export default function UpdateUserPage() {
                             className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 appearance-none outline-none focus:border-blue-500 transition-all cursor-pointer text-sm"
                         >
                             <option value="">Select a custom role...</option>
-                            {customRolesList.map(role => (
-                                <option key={role.id} value={role.id}>{role.name}</option>
+                            {customRolesList.map((role, index) => (
+                                <option key={role.id || `custom-role-${index}`} value={role.id}>{role.name}</option>
                             ))}
                         </select>
                         <div className="absolute right-4 top-3.5 pointer-events-none text-slate-500">
@@ -317,12 +330,9 @@ export default function UpdateUserPage() {
                     </div>
                 </div>
 
-                {/* System Roles Transfer List */}
                 <div>
                     <h3 className="text-sm font-medium text-slate-300 mb-3">System Roles Assignment</h3>
                     <div className="flex flex-col md:flex-row gap-4 items-center">
-                        
-                        {/* Available Roles (Left) */}
                         <div className="flex-1 w-full bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex flex-col h-[320px]">
                             <div className="px-4 py-3 bg-slate-900/80 border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider flex justify-between items-center">
                                 <span>Available Roles</span>
@@ -332,9 +342,9 @@ export default function UpdateUserPage() {
                                 {leftRoles.length === 0 ? (
                                     <div className="h-full flex items-center justify-center text-slate-600 text-xs opacity-70">No roles available</div>
                                 ) : (
-                                    leftRoles.map(role => (
+                                    leftRoles.map((role, index) => (
                                         <div 
-                                            key={role.id} 
+                                            key={role.id || `left-role-${index}`} 
                                             className={`flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-all ${checkedLeft.includes(role.id) ? 'bg-blue-600/10 border border-blue-600/30' : 'hover:bg-slate-900 border border-transparent'}`}
                                             onClick={() => handleCheck(role.id, "left")}
                                         >
@@ -351,7 +361,6 @@ export default function UpdateUserPage() {
                             </div>
                         </div>
 
-                        {/* Middle Transfer Buttons */}
                         <div className="flex flex-row md:flex-col gap-3 relative z-10">
                              <button onClick={moveRight} disabled={checkedLeft.length === 0} className="p-2.5 bg-slate-800 hover:bg-blue-600 disabled:opacity-30 disabled:hover:bg-slate-800 rounded-full border border-slate-700 text-slate-300 hover:text-white transition-all shadow-lg">
                                  <ChevronRight className="w-5 h-5" />
@@ -361,7 +370,6 @@ export default function UpdateUserPage() {
                              </button>
                         </div>
 
-                        {/* Selected Roles (Right) */}
                         <div className="flex-1 w-full bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex flex-col h-[320px]">
                             <div className="px-4 py-3 bg-slate-900/80 border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider flex justify-between items-center">
                                 <span>Selected Roles</span>
@@ -374,9 +382,9 @@ export default function UpdateUserPage() {
                                         <span className="text-[13px] font-medium">No roles selected</span>
                                     </div>
                                 ) : (
-                                    rightRoles.map(role => (
+                                    rightRoles.map((role, index) => (
                                         <div 
-                                            key={role.id} 
+                                            key={role.id || `right-role-${index}`} 
                                             className={`flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-all ${checkedRight.includes(role.id) ? 'bg-red-500/10 border border-red-500/30' : 'hover:bg-slate-900 border border-transparent'}`}
                                             onClick={() => handleCheck(role.id, "right")}
                                         >
@@ -399,7 +407,6 @@ export default function UpdateUserPage() {
         </div>
       </div>
 
-      {/* Footer Buttons */}
       <div className="flex-none p-4 md:px-8 border-t border-slate-800 bg-slate-950 flex justify-end gap-3 z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
             <button onClick={handleCancel} className="px-6 py-2.5 rounded-lg border border-red-500/50 text-red-500 hover:bg-red-500/10 transition-all font-medium text-sm">
                 Cancel
@@ -415,19 +422,19 @@ export default function UpdateUserPage() {
 
       {/* Exit Dialog */}
       {showExitDialog && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200 px-4">
-            <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-sm p-6 text-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-sm p-6 text-center transform scale-100 animate-in zoom-in-95 duration-200">
                 <div className="w-14 h-14 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4 border border-red-500/20">
                   <AlertTriangle className="w-8 h-8 text-red-500" />
                 </div>
                 <h3 className="text-lg font-bold text-white mb-2">Discard Changes?</h3>
-                <p className="text-sm text-slate-400 mb-6">You have unsaved information. Are you sure you want to leave?</p>
-                <div className="flex justify-end gap-3 w-full">
+                <p className="text-sm text-slate-400 mb-6">You have unsaved changes. Are you sure you want to leave?</p>
+                <div className="flex justify-end gap-3">
                     <button onClick={() => setShowExitDialog(false)} className="flex-1 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 rounded-lg transition-colors border border-slate-700">
-                        Stay
+                      Stay
                     </button>
-                    <button onClick={() => router.push(`/admin/users?highlight=${userId}`)} className="flex-1 px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-500 text-white rounded-lg shadow-lg transition-all">
-                        Discard
+                    <button onClick={() => router.push(`/admin/users?highlight=${userId}`)} className="flex-1 px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-500 text-white rounded-lg shadow-lg shadow-red-500/20 transition-all">
+                      Discard
                     </button>
                 </div>
             </div>

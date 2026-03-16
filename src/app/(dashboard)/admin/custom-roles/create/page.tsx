@@ -11,6 +11,8 @@ import {
   AlertTriangle
 } from "lucide-react";
 import { Navbar } from "@/src/components/layout/navbar";
+import { toast } from "sonner";
+import { roleApi } from "@/src/modules/auth/api/role.api";
 
 // --- Interfaces ---
 interface PermissionItem {
@@ -22,33 +24,6 @@ interface PermissionNode {
   category: string;
   items: PermissionItem[];
 }
-
-// --- Mock Data ---
-const MOCK_PERMISSIONS: PermissionNode[] = [
-  {
-    category: "Users Management",
-    items: [
-      { code: "users.create", label: "Create User" },
-      { code: "users.read", label: "View Users List" },
-      { code: "users.update", label: "Edit User Info" },
-      { code: "users.delete", label: "Delete User" },
-    ]
-  },
-  {
-    category: "Roles & Permissions",
-    items: [
-      { code: "roles.manage", label: "Manage System Roles" },
-      { code: "custom_roles.create", label: "Create Custom Role" },
-    ]
-  },
-  {
-    category: "Sensor Configurations",
-    items: [
-      { code: "sensor.view", label: "View Sensor Status" },
-      { code: "sensor.config", label: "Change Sensor Configurations" },
-    ]
-  }
-];
 
 export default function CreateCustomRolePage() {
   const router = useRouter();
@@ -96,11 +71,50 @@ export default function CreateCustomRolePage() {
   };
 
   useEffect(() => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setPermissionList(MOCK_PERMISSIONS);
-      setIsLoading(false);
-    }, 600);
+    const fetchPermissions = async () => {
+      setIsLoading(true);
+      try {
+        const orgId = localStorage.getItem("orgId") || "temp";
+        const res: any = await roleApi.getInitialUserRolePermissions(orgId);
+        
+        const rawData = res?.permissions || [];
+        
+        const finalPermissions: PermissionNode[] = [];
+
+        rawData.forEach((group: any) => {
+          const categoryName = group.controllerName || "Uncategorized";
+          const items: PermissionItem[] = [];
+
+          if (Array.isArray(group.apiPermissions)) {
+            group.apiPermissions.forEach((perm: any) => {
+              const code = `${group.controllerName}.${perm.apiName}`;
+              
+              items.push({
+                code: code,           
+                label: perm.apiName,  
+              });
+            });
+          }
+
+          if (items.length > 0) {
+            finalPermissions.push({
+              category: categoryName,
+              items: items
+            });
+          }
+        });
+
+        setPermissionList(finalPermissions);
+        
+      } catch (error) {
+        console.error("Failed to load permissions:", error);
+        toast.error("Failed to load permissions from server");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPermissions();
   }, []);
 
   const filteredPermissions = useMemo(() => {
@@ -158,20 +172,62 @@ export default function CreateCustomRolePage() {
   };
 
   const handleSubmit = async () => {
+    let finalTags = [...formData.tags];
+    const pendingTag = tagInput.trim();
+    if (pendingTag && !finalTags.includes(pendingTag)) finalTags.push(pendingTag);
+
     const newErrors: { [key: string]: string } = {};
     if (!formData.roleName.trim()) newErrors.roleName = "Role Name is required"; 
     if (!formData.description.trim()) newErrors.description = "Description is required";
-    if (formData.tags.length === 0 && !tagInput.trim()) newErrors.tags = "At least one tag is required";
     
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) return;
 
     setIsSubmitting(true);
-    setTimeout(() => {
-        setIsSubmitting(false);
-        alert("Role Created Successfully (Mock)");
-        goBack(); 
-    }, 1000);
+    try {
+      const orgId = localStorage.getItem("orgId") || "temp";
+      const formattedPermissions = permissionList.map(group => {
+        return {
+          controllerName: group.category,
+          apiPermissions: group.items.map(item => {
+            return {
+              controllerName: group.category,
+              apiName: item.label, 
+              isAllowed: selectedPermissions.includes(item.code) 
+            };
+          })
+        };
+      });
+
+      const payload = {
+        RoleName: formData.roleName, 
+        RoleDescription: formData.description, 
+        Tags: finalTags.join(","),             
+        Permissions: formattedPermissions
+      };
+
+      const res: any = await roleApi.addCustomRole(orgId, payload);
+      
+      toast.success("Custom role created successfully!");
+      
+      const newId = res?.data?.id || res?.data?.customRoleId || res?.id || res?.customRoleName;
+      goBack(newId);
+
+    } catch (error: any) {
+      console.error("Create custom role error:", error);
+      
+      let errorMsg = "Failed to create custom role";
+      if (error?.response?.data?.errors) {
+        const firstErrorKey = Object.keys(error.response.data.errors)[0];
+        errorMsg = error.response.data.errors[firstErrorKey][0];
+      } else {
+        errorMsg = error?.response?.data?.description || error?.message || errorMsg;
+      }
+
+      toast.error(errorMsg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (isLoading) {
@@ -181,7 +237,7 @@ export default function CreateCustomRolePage() {
         <div className="flex-1 flex items-center justify-center text-slate-400">
           <div className="flex flex-col items-center gap-3">
             <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-            <span>Loading...</span>
+            <span>Loading Permissions...</span>
           </div>
         </div>
       </div>
@@ -246,7 +302,7 @@ export default function CreateCustomRolePage() {
                 </div>
                 
                 <div className="space-y-2 mt-6">
-                    <label className="text-sm font-medium text-slate-300">Tags <span className="text-red-400">*</span></label>
+                    <label className="text-sm font-medium text-slate-300">Tags</label>
                     <div className={`w-full bg-slate-950 border ${errors.tags ? 'border-red-500/50' : 'border-slate-700 focus-within:border-blue-500'} rounded-lg px-3 py-2 min-h-[46px] flex flex-wrap gap-2 items-center transition-all`}>
                         {formData.tags.map(tag => (
                             <span key={tag} className="bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium px-2.5 py-1 rounded-full flex items-center gap-1.5 animate-in fade-in zoom-in duration-200">
@@ -283,57 +339,61 @@ export default function CreateCustomRolePage() {
                 </div>
 
                 <div className="space-y-6">
-                    {filteredPermissions.map((group) => {
-                        const isAllSelected = group.items.every(i => selectedPermissions.includes(i.code));
-                        const isSomeSelected = group.items.some(i => selectedPermissions.includes(i.code));
+                    {filteredPermissions.length === 0 ? (
+                        <p className="text-sm text-slate-500 italic">No permissions found.</p>
+                    ) : (
+                      filteredPermissions.map((group) => {
+                          const isAllSelected = group.items.every(i => selectedPermissions.includes(i.code));
+                          const isSomeSelected = group.items.some(i => selectedPermissions.includes(i.code));
 
-                        return (
-                            <div key={group.category} className="space-y-3">
-                                <div 
-                                    className="flex items-center gap-2 group cursor-pointer select-none"
-                                    onClick={() => toggleCategory(group.category, group.items)}
-                                >
-                                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all duration-200
-                                        ${isAllSelected 
-                                            ? 'bg-blue-600 border-blue-600' 
-                                            : isSomeSelected 
-                                                ? 'bg-blue-600/50 border-blue-500' 
-                                                : 'bg-slate-950 border-slate-700 group-hover:border-slate-500'}
-                                    `}>
-                                        {isAllSelected && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
-                                        {!isAllSelected && isSomeSelected && <div className="w-2.5 h-2.5 bg-white rounded-sm" />}
-                                    </div>
-                                    <span className="font-semibold text-slate-200">{group.category}</span>
-                                </div>
+                          return (
+                              <div key={group.category} className="space-y-3">
+                                  <div 
+                                      className="flex items-center gap-2 group cursor-pointer select-none w-fit"
+                                      onClick={() => toggleCategory(group.category, group.items)}
+                                  >
+                                      <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all duration-200
+                                          ${isAllSelected 
+                                              ? 'bg-blue-600 border-blue-600' 
+                                              : isSomeSelected 
+                                                  ? 'bg-blue-600/50 border-blue-500' 
+                                                  : 'bg-slate-950 border-slate-700 group-hover:border-slate-500'}
+                                      `}>
+                                          {isAllSelected && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
+                                          {!isAllSelected && isSomeSelected && <div className="w-2.5 h-2.5 bg-white rounded-sm" />}
+                                      </div>
+                                      <span className="font-semibold text-slate-200">{group.category}</span>
+                                  </div>
 
-                                <div className="pl-7 space-y-1 relative border-l border-slate-800 ml-2.5">
-                                    {group.items.map(item => {
-                                        const isSelected = selectedPermissions.includes(item.code);
-                                        return (
-                                            <div 
-                                                key={item.code} 
-                                                className={`flex items-center gap-3 py-1.5 px-3 rounded-md cursor-pointer transition-all ml-2
-                                                    ${isSelected ? 'bg-blue-900/20' : 'hover:bg-slate-800/60'}
-                                                `}
-                                                onClick={() => togglePermission(item.code)}
-                                            >
-                                                <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors
-                                                        ${isSelected 
-                                                            ? 'bg-blue-600 border-blue-600' 
-                                                            : 'bg-slate-950 border-slate-700 hover:border-slate-500'}
-                                                `}>
-                                                    {isSelected && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
-                                                </div>
-                                                <span className={`text-sm ${isSelected ? 'text-blue-200' : 'text-slate-400'}`}>
-                                                    {item.label}
-                                                </span>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        );
-                    })}
+                                  <div className="pl-7 space-y-1 relative border-l border-slate-800 ml-2.5">
+                                      {group.items.map(item => {
+                                          const isSelected = selectedPermissions.includes(item.code);
+                                          return (
+                                              <div 
+                                                  key={item.code} 
+                                                  className={`flex items-center gap-3 py-1.5 px-3 rounded-md cursor-pointer transition-all ml-2 w-fit
+                                                      ${isSelected ? 'bg-blue-900/20' : 'hover:bg-slate-800/60'}
+                                                  `}
+                                                  onClick={() => togglePermission(item.code)}
+                                              >
+                                                  <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors
+                                                          ${isSelected 
+                                                              ? 'bg-blue-600 border-blue-600' 
+                                                              : 'bg-slate-950 border-slate-700 hover:border-slate-500'}
+                                                  `}>
+                                                      {isSelected && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                                                  </div>
+                                                  <span className={`text-sm ${isSelected ? 'text-blue-200' : 'text-slate-400'}`}>
+                                                      {item.label}
+                                                  </span>
+                                              </div>
+                                          );
+                                      })}
+                                  </div>
+                              </div>
+                          );
+                      })
+                    )}
                 </div>
             </div>
         </div>

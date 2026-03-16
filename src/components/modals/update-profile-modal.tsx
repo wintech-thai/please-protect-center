@@ -2,6 +2,8 @@
 
 import { X, AlertTriangle, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner"; 
+import { profileApi } from "@/src/modules/auth/api/profile.api"; 
 
 interface UpdateProfileModalProps {
   isOpen: boolean;
@@ -10,37 +12,56 @@ interface UpdateProfileModalProps {
 
 export function UpdateProfileModal({ isOpen, onClose }: UpdateProfileModalProps) {
   const [isVisible, setIsVisible] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);     
+  const [isFetching, setIsFetching] = useState(false);   
   const [showConfirmClose, setShowConfirmClose] = useState(false);
   
-  // (Mock Data)
-  const [userId, setUserId] = useState<string | null>("mock-user-001");
   const [initialData, setInitialData] = useState<any>(null);
   const [formData, setFormData] = useState({
-    username: "admin_super",
-    email: "admin@rtarf.mi.th",
-    firstName: "System",
-    lastName: "Administrator",
-    phone: "0812345678",
-    secondaryEmail: "backup@cyber.mil",
+    username: "",
+    email: "",
+    firstName: "",
+    lastName: "",
+    phone: "",
+    secondaryEmail: "",
   });
 
   const isDirty = JSON.stringify(formData) !== JSON.stringify(initialData);
 
   useEffect(() => {
+    const fetchProfile = async () => {
+      setIsFetching(true);
+      try {
+        const orgId = localStorage.getItem("orgId") || "temp";
+        const userName = localStorage.getItem("userName") || "admin_super"; 
+
+        const res = await profileApi.getUserByUserName(orgId, userName);
+        
+        const userData = res?.user || {};
+
+        const loadedData = {
+          username: userData.userName || userName,
+          email: userData.userEmail || "",
+          firstName: userData.name || "",
+          lastName: userData.lastName || "",
+          phone: userData.phoneNumber || "",
+          secondaryEmail: userData.secondaryEmail || "",
+        };
+
+        setFormData(loadedData);
+        setInitialData(loadedData);
+      } catch (error: any) {
+        console.error("Fetch profile error:", error);
+        toast.error("Failed to load profile data.");
+      } finally {
+        setIsFetching(false);
+      }
+    };
+
     if (isOpen) {
       setIsVisible(true);
       document.body.style.overflow = 'hidden';
-      const data = {
-        username: "admin_super",
-        email: "admin@rtarf.mi.th",
-        firstName: "System",
-        lastName: "Administrator",
-        phone: "0812345678",
-        secondaryEmail: "backup@cyber.mil",
-      };
-      setFormData(data);
-      setInitialData(data);
+      fetchProfile(); 
     } else {
       setTimeout(() => setIsVisible(false), 300);
       document.body.style.overflow = 'unset';
@@ -58,11 +79,27 @@ export function UpdateProfileModal({ isOpen, onClose }: UpdateProfileModalProps)
 
   const handleSave = async () => {
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      setInitialData(formData);
+    try {
+      const orgId = localStorage.getItem("orgId") || "temp";
+      
+      const payload = {
+        name: formData.firstName,
+        lastName: formData.lastName,
+        phoneNumber: formData.phone,
+        secondaryEmail: formData.secondaryEmail,
+      };
+
+      await profileApi.updateUserByUserName(orgId, formData.username, payload);
+      
+      toast.success("Profile updated successfully!");
+      setInitialData(formData); 
       onClose();
-    }, 1000);
+    } catch (error: any) {
+      console.error("Update profile error:", error);
+      toast.error(error?.response?.data?.message || "Failed to update profile.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (!isVisible) return null;
@@ -103,56 +140,65 @@ export function UpdateProfileModal({ isOpen, onClose }: UpdateProfileModalProps)
         </div>
 
         {/* Body */}
-        <div className="p-8 space-y-6 relative z-10">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <InputField
-              label="Username"
-              value={formData.username}
-              disabled
-              readOnly
-            />
-            <InputField
-              label="Email Address"
-              value={formData.email}
-              disabled
-              readOnly
-            />
-          </div>
+        <div className="p-8 space-y-6 relative z-10 min-h-[300px]">
+          {isFetching ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0B1120]/80 z-20">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-500 mb-4" />
+              <p className="text-slate-400 text-sm">Loading profile data...</p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <InputField
+                  label="Username"
+                  value={formData.username}
+                  disabled
+                  readOnly
+                />
+                <InputField
+                  label="Email Address"
+                  value={formData.email}
+                  disabled
+                  readOnly
+                />
+              </div>
 
-          <div className="h-px w-full bg-blue-900/20"></div>
+              <div className="h-px w-full bg-blue-900/20"></div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <InputField
-              label="First Name"
-              placeholder="Enter first name"
-              value={formData.firstName}
-              onChange={(e: any) => setFormData({...formData, firstName: e.target.value})}
-              required
-            />
-            <InputField
-              label="Last Name"
-              placeholder="Enter last name"
-              value={formData.lastName}
-              onChange={(e: any) => setFormData({...formData, lastName: e.target.value})}
-              required
-            />
-          </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <InputField
+                  label="First Name"
+                  placeholder="Enter first name"
+                  value={formData.firstName}
+                  onChange={(e: any) => setFormData({...formData, firstName: e.target.value})}
+                  required
+                />
+                <InputField
+                  label="Last Name"
+                  placeholder="Enter last name"
+                  value={formData.lastName}
+                  onChange={(e: any) => setFormData({...formData, lastName: e.target.value})}
+                  required
+                />
+              </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <InputField
-              label="Phone Number"
-              placeholder="e.g. 0812345678"
-              value={formData.phone}
-              onChange={(e: any) => setFormData({...formData, phone: e.target.value})}
-              required
-            />
-            <InputField
-              label="Secondary Email"
-              placeholder="Optional secondary email"
-              value={formData.secondaryEmail}
-              onChange={(e: any) => setFormData({...formData, secondaryEmail: e.target.value})}
-            />
-          </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <InputField
+                  label="Phone Number"
+                  placeholder="e.g. 0812345678"
+                  value={formData.phone}
+                  onChange={(e: any) => setFormData({...formData, phone: e.target.value})}
+                  required
+                />
+                <InputField
+                  label="Secondary Email"
+                  placeholder="Optional secondary email"
+                  value={formData.secondaryEmail}
+                  onChange={(e: any) => setFormData({...formData, secondaryEmail: e.target.value})}
+                />
+              </div>
+            </>
+          )}
         </div>
 
         {/* Footer */}
@@ -160,16 +206,16 @@ export function UpdateProfileModal({ isOpen, onClose }: UpdateProfileModalProps)
           <button
             onClick={handleCloseAttempt}
             className="px-6 py-2.5 text-sm font-medium text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-all uppercase"
-            disabled={isLoading}
+            disabled={isLoading || isFetching}
           >
             Cancel
           </button>
 
           <button 
             onClick={handleSave}
-            disabled={isLoading} 
+            disabled={isLoading || isFetching} 
             className={`px-8 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-500 shadow-lg min-w-[120px] transition-all flex items-center justify-center gap-2 uppercase ${
-              isLoading ? "opacity-50 cursor-not-allowed" : ""
+              (isLoading || isFetching) ? "opacity-50 cursor-not-allowed" : ""
             }`}
           >
             {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
