@@ -1,14 +1,23 @@
 import { NextResponse } from 'next/server';
 import { Client } from '@elastic/elasticsearch';
 
-const esClient = new Client({
-  node: process.env.ES_URL,
-  auth: {
-    username: process.env.ES_USER || '',
-    password: process.env.ES_PASSWORD || '',
-  },
-  tls: { rejectUnauthorized: false }
-});
+const getEsClient = () => {
+  if (!process.env.ES_URL) {
+    throw new Error("ES_URL environment variable is missing.");
+  }
+  return new Client({
+    node: process.env.ES_URL,
+    auth: {
+      username: process.env.ES_USER || '',
+      password: process.env.ES_PASSWORD || '',
+    },
+    tls: { rejectUnauthorized: false },
+    headers: {
+      'Accept': 'application/vnd.elasticsearch+json; compatible-with=8',
+      'Content-Type': 'application/vnd.elasticsearch+json; compatible-with=8'
+    }
+  });
+};
 
 export async function POST(req: Request) {
   try {
@@ -28,10 +37,10 @@ export async function POST(req: Request) {
       ...esPayload
     };
 
+    const esClient = getEsClient();
     const result = await esClient.search(searchPayload);
 
     const hits = result.hits?.hits || (result as any).body?.hits?.hits || [];
-    
     const rawTotal = result.hits?.total || (result as any).body?.hits?.total;
     const total = typeof rawTotal === 'number' ? rawTotal : (rawTotal?.value || 0);
     
