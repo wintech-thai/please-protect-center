@@ -10,21 +10,17 @@ import {
   ChevronRight, 
   MoreHorizontal,
   Trash2,
-  Key,
   ShieldCheck,
   Check,
-  X
+  X,
+  Loader2
 } from "lucide-react";
 import { Navbar } from "@/src/components/layout/navbar"; 
+import { toast } from "sonner";
 
-// --- Mock Data สำหรับ API Keys ---
-const MOCK_API_KEYS = [
-  { id: "k1", keyName: "Sentinel-Integrator-01", description: "Production key for main firewall integration.", customRole: "Security Analyst", roles: "Editor", status: "Active" },
-  { id: "k2", keyName: "Audit-Log-Exporter", description: "Used by internal auditing script for weekly reports.", customRole: "Auditor", roles: "Viewer", status: "Active" },
-  { id: "k3", keyName: "CI-CD-Deployment", description: "Deployment key for automated sensor updates.", customRole: "System Admin", roles: "Super Admin", status: "Disabled" },
-  { id: "k4", keyName: "Mobile-Dashboard-App", description: "Access key for commander's mobile view.", customRole: "Viewer", roles: "Viewer", status: "Active" },
-  { id: "k5", keyName: "External-Scanner-API", description: "Third-party scanner integration key.", customRole: "Operator", roles: "Editor", status: "Pending" },
-];
+// 🚀 Import APIs
+import { apiKeyApi } from "@/src/modules/auth/api/api-key.api"; 
+import { roleApi } from "@/src/modules/auth/api/role.api";
 
 export default function ApiKeysPage() {
   const pathname = usePathname(); 
@@ -32,17 +28,21 @@ export default function ApiKeysPage() {
   const highlightIdParam = searchParams.get("highlight");
 
   // States
-  const [keys, setKeys] = useState(MOCK_API_KEYS);
-  const [totalCount, setTotalCount] = useState(MOCK_API_KEYS.length);
+  const [keys, setKeys] = useState<any[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedRowId, setSelectedRowId] = useState<string | null>(highlightIdParam);
   
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+
   const [page, setPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [searchTerm, setSearchTerm] = useState("");
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false); 
-  const [targetKey, setTargetKey] = useState<typeof MOCK_API_KEYS[0] | null>(null);
+  const [targetKey, setTargetKey] = useState<any | null>(null);
 
   const rowRefs = useRef<{ [key: string]: HTMLTableRowElement | null }>({});
 
@@ -55,20 +55,124 @@ export default function ApiKeysPage() {
     }
   }, [highlightIdParam, pathname, searchParams]);
 
-  const handleSearchTrigger = () => {
-    setPage(1);
-    const filtered = MOCK_API_KEYS.filter(k => 
-      k.keyName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      k.description.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setKeys(filtered);
-    setTotalCount(filtered.length);
+  useEffect(() => {
+    const handleClickOutside = () => setOpenDropdownId(null);
+    window.addEventListener("click", handleClickOutside);
+    return () => window.removeEventListener("click", handleClickOutside);
+  }, []);
+
+  const fetchApiKeysData = async (currentPage: number, searchKeyword: string = "") => {
+    setIsLoading(true);
+    try {
+      const orgId = localStorage.getItem("orgId") || "temp";
+      const currentOffset = (currentPage - 1) * itemsPerPage;
+      const payload = { offset: currentOffset, limit: itemsPerPage, fullTextSearch: searchKeyword };
+
+      const [keysRes, countRes, rolesRes] = await Promise.all([
+        apiKeyApi.getApiKeys(orgId, payload),
+        apiKeyApi.getApiKeyCount(orgId, { fullTextSearch: searchKeyword }),
+        roleApi.getRoles(orgId, { limit: 100 })
+      ]);
+      
+      const sysRoles = rolesRes?.data || rolesRes || [];
+      const roleMap: Record<string, string> = {};
+      sysRoles.forEach((r: any) => {
+          roleMap[r.roleId || r.id] = r.roleName || r.name;
+      });
+
+      const keysData = keysRes?.data ? keysRes.data : (Array.isArray(keysRes) ? keysRes : []);
+      
+      const formattedKeys = keysData.map((k: any) => {
+          let roleStr = "-";
+          if (Array.isArray(k.roles) && k.roles.length > 0) {
+              roleStr = k.roles.join(", "); 
+          } else if (k.rolesList && k.rolesList.trim() !== "") {
+              roleStr = k.rolesList;
+          } else if (typeof k.roles === 'string' && k.roles.trim() !== "") {
+              roleStr = k.roles;
+          }
+
+          let statusText = k.keyStatus || k.status || "Active";
+          if (k.isActive === false) statusText = "Disabled";
+
+          return {
+              ...k,
+              id: k.keyId || k.id,
+              keyName: k.keyName || k.apiKeyName || k.name || "-",
+              description: k.keyDescription || k.description || "-",
+              customRole: k.customRoleName || k.customRoleId || "-",
+              roles: roleStr,
+              status: statusText
+          };
+      });
+
+      setKeys(formattedKeys);
+      
+      let count = 0;
+      if (typeof countRes === "number") count = countRes;
+      else if (countRes && typeof countRes === "object") {
+        count = countRes.count || countRes.totalCount || countRes.data || keysData.length; 
+      }
+      setTotalCount(count); 
+
+    } catch (error: any) {
+      console.error("Fetch API Keys Error:", error);
+      toast.error("Failed to load API keys");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleBulkDelete = () => {
-    setKeys(keys.filter(k => !selectedIds.includes(k.id)));
-    setSelectedIds([]);
-    setShowDeleteConfirm(false);
+  useEffect(() => {
+    fetchApiKeysData(page, searchTerm);
+  }, [page, itemsPerPage]);
+
+  const handleSearchTrigger = () => {
+    setPage(1);
+    fetchApiKeysData(1, searchTerm); 
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    
+    const orgId = localStorage.getItem("orgId") || "temp";
+    
+    try {
+      for (const id of selectedIds) { 
+        await apiKeyApi.deleteApiKeyById(orgId, id); 
+      }
+      
+      toast.success("Successfully revoked API key(s).");
+      setSelectedIds([]);
+      setShowDeleteConfirm(false);
+      
+      fetchApiKeysData(page, searchTerm);
+    } catch (error: any) {
+      console.error("Delete API key error:", error);
+      const errorMsg = error?.response?.data?.description || error?.message || "Failed to revoke key(s)";
+      toast.error(errorMsg);
+    }
+  };
+
+  const handleToggleStatus = async (id: string, currentStatus: string) => {
+    const orgId = localStorage.getItem("orgId") || "temp";
+    const toastId = toast.loading(`${currentStatus === 'Active' ? 'Disabling' : 'Enabling'} API key...`);
+    
+    try {
+      if (currentStatus === 'Active') {
+        await apiKeyApi.disableApiKeyById(orgId, id);
+        toast.success("API key disabled successfully.", { id: toastId });
+      } else {
+        await apiKeyApi.enableApiKeyById(orgId, id);
+        toast.success("API key enabled successfully.", { id: toastId });
+      }
+      
+      fetchApiKeysData(page, searchTerm);
+    } catch (error: any) {
+      console.error("Toggle status error:", error);
+      const errorMsg = error?.response?.data?.description || error?.message || "Failed to change status.";
+      toast.error(errorMsg, { id: toastId });
+    }
   };
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -94,8 +198,8 @@ export default function ApiKeysPage() {
         <div className="flex-none pt-6 px-6 mb-2">
           <div className="flex items-center gap-4">
               <div>
-                  <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">API Keys Management</h1>
-                  <p className="text-slate-400 text-xs md:text-sm">Manage authentication keys and access tokens for system integrations.</p>
+                  <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">API Keys</h1>
+                  <p className="text-slate-400 text-xs md:text-sm">Manage API access keys and permissions</p>
               </div>
           </div>
         </div>
@@ -106,9 +210,7 @@ export default function ApiKeysPage() {
               <div className="flex flex-col sm:flex-row w-full lg:w-auto gap-2">
                   <div className="relative w-full sm:w-auto sm:min-w-[160px]">
                       <select className="w-full appearance-none bg-[#162032] border border-blue-900/50 text-slate-200 text-sm rounded-lg pl-3 pr-8 py-2.5 focus:outline-none focus:border-cyan-500 transition-colors cursor-pointer">
-                          <option>All Fields</option>
-                          <option>Key Name</option>
-                          <option>Description</option>
+                          <option>Full Text Search</option>
                       </select>
                       <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3 top-3 pointer-events-none" />
                   </div>
@@ -165,63 +267,111 @@ export default function ApiKeysPage() {
                           </tr>
                       </thead>
                       <tbody className="divide-y divide-blue-900/20">
-                          {keys.map((apiKey) => {
-                              const isSelected = selectedRowId === apiKey.id;
-                              return (
-                                  <tr 
-                                      key={apiKey.id} 
-                                      ref={(el) => { if (el) rowRefs.current[apiKey.id] = el; }}
-                                      onClick={() => setSelectedRowId(apiKey.id)}
-                                      className={`transition-all duration-300 group text-sm cursor-pointer hover:bg-blue-900/10
-                                        ${isSelected ? "bg-blue-900/20 border-l-4 border-l-cyan-400" : "border-l-4 border-l-transparent"}
-                                      `}
-                                  >
-                                      <td className="p-4 text-center" onClick={(e) => e.stopPropagation()}>
-                                        <input type="checkbox" checked={selectedIds.includes(apiKey.id)} onChange={() => handleSelectOne(apiKey.id)} className="rounded border-slate-600 bg-slate-800" />
-                                      </td>
-                                      
-                                      <td className="p-4 px-6 font-medium text-slate-200">
-                                        <div className="flex items-center gap-2">
-                                          <Key className="w-3.5 h-3.5 text-blue-400" />
-                                          <Link href={`/admin/api-keys/${apiKey.id}/update`} className={`hover:underline ${isSelected ? 'text-cyan-400' : 'text-blue-400 hover:text-cyan-300'}`} onClick={(e) => e.stopPropagation()}>
-                                            {apiKey.keyName}
-                                          </Link>
-                                        </div>
-                                      </td>
+                          {isLoading ? (
+                              <tr><td colSpan={7} className="p-20 text-center text-slate-500 animate-pulse">Loading API keys...</td></tr>
+                          ) : keys.length === 0 ? (
+                              <tr><td colSpan={7} className="p-20 text-center text-slate-500 font-medium italic">No API keys found.</td></tr>
+                          ) : (
+                              keys.map((apiKey) => {
+                                  const isSelected = selectedRowId === apiKey.id;
+                                  return (
+                                      <tr 
+                                          key={apiKey.id} 
+                                          ref={(el) => { if (el) rowRefs.current[apiKey.id] = el; }}
+                                          onClick={() => setSelectedRowId(apiKey.id)}
+                                          className={`transition-all duration-300 group text-sm cursor-pointer hover:bg-blue-900/10 relative
+                                            ${isSelected ? "bg-blue-900/20 border-l-4 border-l-cyan-400" : "border-l-4 border-l-transparent"}
+                                            ${openDropdownId === apiKey.id ? 'z-20' : 'z-0'} 
+                                          `}
+                                      >
+                                          <td className="p-4 text-center" onClick={(e) => e.stopPropagation()}>
+                                            <input type="checkbox" checked={selectedIds.includes(apiKey.id)} onChange={() => handleSelectOne(apiKey.id)} className="rounded border-slate-600 bg-slate-800" />
+                                          </td>
+                                          
+                                          <td className="p-4 px-6 font-medium text-slate-200">
+                                              <Link href={`/admin/api-keys/${apiKey.id}/update`} className={`hover:underline ${isSelected ? 'text-cyan-400' : 'text-blue-400 hover:text-cyan-300'}`} onClick={(e) => e.stopPropagation()}>
+                                                {apiKey.keyName}
+                                              </Link>
+                                          </td>
 
-                                      <td className="p-4 px-6 text-slate-400 text-sm max-w-[300px] truncate">{apiKey.description}</td>
-                                      
-                                      <td className="p-4 px-6 text-slate-400 font-medium italic">{apiKey.customRole}</td>
-                                      
-                                      <td className="p-4 px-6">
-                                          <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-600 text-white rounded uppercase">{apiKey.roles}</span>
-                                      </td>
+                                          <td className="p-4 px-6 text-slate-400 text-sm max-w-[300px] truncate">{apiKey.description}</td>
+                                          
+                                          <td className="p-4 px-6 text-slate-400 font-medium italic">{apiKey.customRole}</td>
+                                          
+                                          <td className="p-4 px-6">
+                                              {apiKey.roles && apiKey.roles !== "-" ? (
+                                                  <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-600/20 border border-blue-600/30 text-blue-300 rounded uppercase">{apiKey.roles}</span>
+                                              ) : (
+                                                  <span className="text-slate-500">-</span>
+                                              )}
+                                          </td>
 
-                                      <td className="p-4 px-6 font-medium">
-                                          <div className="flex items-center gap-2">
-                                              <div className={`w-2 h-2 rounded-full ${apiKey.status === 'Active' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : apiKey.status === 'Pending' ? 'bg-amber-500' : 'bg-slate-600'}`} />
+                                          <td className="p-4 px-6 font-medium">
                                               <span className={apiKey.status === 'Disabled' ? 'text-slate-500' : apiKey.status === 'Pending' ? 'text-amber-400' : 'text-emerald-400'}>
                                                 {apiKey.status}
                                               </span>
-                                          </div>
-                                      </td>
-                                      
-                                      <td className="p-4 px-6 text-center relative" onClick={(e) => e.stopPropagation()}>
-                                          <button onClick={() => setTargetKey(targetKey?.id === apiKey.id ? null : apiKey)} className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition-colors border border-transparent hover:border-slate-700">
-                                              <MoreHorizontal className="w-4 h-4" />
-                                          </button>
+                                          </td>
+                                          
+                                          <td className="p-4 px-6 text-center relative" onClick={(e) => e.stopPropagation()}>
+                                              <button 
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setOpenDropdownId(openDropdownId === apiKey.id ? null : apiKey.id);
+                                                  setSelectedRowId(apiKey.id);
+                                                }} 
+                                                className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition-colors border border-transparent hover:border-slate-700"
+                                              >
+                                                  <MoreHorizontal className="w-4 h-4" />
+                                              </button>
 
-                                          {targetKey?.id === apiKey.id && (
-                                              <div className="absolute right-8 top-10 bg-[#0B1120] border border-blue-900/50 shadow-xl rounded-lg w-40 z-50 p-1 flex flex-col text-left">
-                                                 <button onClick={() => alert("Key Copied!")} className="px-3 py-2 text-xs text-cyan-400 hover:bg-blue-900/30 rounded flex items-center gap-2 transition-all"><Key className="w-3.5 h-3.5" /> Copy Key String</button>
-                                                 <div className="h-px bg-blue-900/30 my-1 mx-1"></div>
-                                                 <button onClick={() => { setTargetKey(null); setShowDeleteConfirm(true); setSelectedIds([apiKey.id]); }} className="px-3 py-2 text-xs text-red-400 hover:bg-red-900/30 rounded flex items-center gap-2 transition-all"><Trash2 className="w-3.5 h-3.5" /> Revoke Key</button>
-                                              </div>
-                                          )}
-                                      </td>
-                                  </tr>
-                              );
-                          })}
+                                              {openDropdownId === apiKey.id && (
+                                                <div className="absolute right-8 top-12 bg-[#162032] border border-slate-700/50 shadow-xl rounded-md w-32 z-[100] p-1 flex flex-col text-left animate-in fade-in zoom-in-95 duration-100">
+                                                    
+                                                    {/* ปุ่ม Disable */}
+                                                    <button 
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          if(apiKey.status === 'Active') {
+                                                            setOpenDropdownId(null);
+                                                            handleToggleStatus(apiKey.id, apiKey.status);
+                                                          }
+                                                        }}
+                                                        disabled={apiKey.status !== 'Active'}
+                                                        className={`px-3 py-2 text-sm font-medium rounded text-left transition-all ${
+                                                          apiKey.status === 'Active' 
+                                                            ? 'text-red-400 hover:bg-red-500/10' 
+                                                            : 'text-slate-500 cursor-not-allowed opacity-60'
+                                                        }`}
+                                                    >
+                                                        Disable Key
+                                                    </button>
+
+                                                    {/* ปุ่ม Enable */}
+                                                    <button 
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          if(apiKey.status !== 'Active') {
+                                                            setOpenDropdownId(null);
+                                                            handleToggleStatus(apiKey.id, apiKey.status);
+                                                          }
+                                                        }}
+                                                        disabled={apiKey.status === 'Active'}
+                                                        className={`px-3 py-2 text-sm font-medium rounded text-left transition-all ${
+                                                          apiKey.status !== 'Active' 
+                                                            ? 'text-slate-300 hover:bg-slate-800 hover:text-white' 
+                                                            : 'text-slate-500 cursor-not-allowed opacity-60'
+                                                        }`}
+                                                    >
+                                                        Enable Key
+                                                    </button>
+
+                                                </div>
+                                              )}
+                                          </td>
+                                      </tr>
+                                  );
+                              })
+                          )}
                       </tbody>
                   </table>
               </div>
@@ -237,10 +387,10 @@ export default function ApiKeysPage() {
                       </select>
                   </div>
                   <div className="flex items-center gap-4">
-                      <div className="text-xs">{totalCount === 0 ? '0-0' : `${startRow}-${endRow}`} of {totalCount}</div>
+                      <div className="text-xs text-slate-400">{totalCount === 0 ? '0-0' : `${startRow}-${endRow}`} of {totalCount}</div>
                       <div className="flex items-center gap-1">
-                          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded hover:bg-blue-900/40 text-slate-400 disabled:opacity-30 transition-colors"><ChevronLeft className="w-5 h-5" /></button>
-                          <button onClick={() => setPage(p => Math.min(Math.ceil(totalCount/itemsPerPage), p + 1))} disabled={page >= Math.ceil(totalCount/itemsPerPage) || totalCount === 0} className="p-1.5 rounded hover:bg-blue-900/40 text-slate-400 disabled:opacity-30 transition-colors"><ChevronRight className="w-5 h-5" /></button>
+                          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1 || isLoading} className="p-1.5 rounded hover:bg-blue-900/40 text-slate-400 disabled:opacity-30 transition-colors"><ChevronLeft className="w-5 h-5" /></button>
+                          <button onClick={() => setPage(p => Math.min(Math.ceil(totalCount/itemsPerPage), p + 1))} disabled={page >= Math.ceil(totalCount/itemsPerPage) || totalCount === 0 || isLoading} className="p-1.5 rounded hover:bg-blue-900/40 text-slate-400 disabled:opacity-30 transition-colors"><ChevronRight className="w-5 h-5" /></button>
                       </div>
                   </div>
               </div>

@@ -59,4 +59,12 @@ export const userApi = {
     const response = await client.post(`/api/OrganizationUser/org/${orgId}/action/DisableUserById/${userId}`,);
     return response.data;
   },
+
+  confirmInvite: async (orgId: string, token: string, userName: string, data: any) => {
+  const response = await client.post(
+    `/api/Registration/org/${orgId}/action/ConfirmNewUserInvitation/${token}/${userName}`,
+    data
+  );
+  return response.data;
+},
 };

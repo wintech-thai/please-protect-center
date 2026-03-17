@@ -15,27 +15,15 @@ import {
   AlertTriangle
 } from "lucide-react";
 import { Navbar } from "@/src/components/layout/navbar";
+import { toast } from "sonner"; 
+import { roleApi } from "@/src/modules/auth/api/role.api";
+import { apiKeyApi } from "@/src/modules/auth/api/api-key.api";
 
 interface RoleItem {
   id: string;
   name: string;
   desc?: string; 
 }
-
-// --- Mock Data ---
-const MOCK_SYSTEM_ROLES = [
-  { id: "sr1", name: "Super Admin", desc: "Full system access, manage all modules and users." },
-  { id: "sr2", name: "Security Analyst", desc: "Monitor security events and manage threat detection." },
-  { id: "sr3", name: "Threat Hunter", desc: "Search for cyber threats and investigate incidents." },
-  { id: "sr4", name: "Viewer", desc: "Read-only access to dashboards and reports." },
-  { id: "sr5", name: "Editor", desc: "Can edit configurations but cannot manage users." },
-];
-
-const MOCK_CUSTOM_ROLES = [
-  { id: "cr1", name: "System Administrator", desc: "IT admin full access" },
-  { id: "cr2", name: "SOC Analyst Level 1", desc: "Basic monitoring" },
-  { id: "cr3", name: "Guest Viewer", desc: "External viewer" },
-];
 
 export default function CreateApiKeyPage() {
   const router = useRouter();
@@ -89,16 +77,38 @@ export default function CreateApiKeyPage() {
     }
   };
 
-  // --- Fetch Mock Data ---
   useEffect(() => {
     const initData = async () => {
       setIsLoadingData(true);
-      setTimeout(() => {
-        setLeftRoles(MOCK_SYSTEM_ROLES);
-        setCustomRolesList(MOCK_CUSTOM_ROLES);
+      try {
+        const orgId = localStorage.getItem("orgId") || "temp";
+        
+        const [rolesRes, customRolesRes] = await Promise.all([
+          roleApi.getRoles(orgId, { limit: 100 }),
+          roleApi.getCustomRoles(orgId, { limit: 100 })
+        ]);
+
+        const sysRoles = rolesRes?.data || rolesRes || [];
+        setLeftRoles(sysRoles.map((r: any) => ({
+          id: r.roleId || r.id,
+          name: r.roleName || r.name,
+          desc: r.roleDescription || r.description
+        })));
+
+        const cusRoles = customRolesRes?.data || customRolesRes || [];
+        setCustomRolesList(cusRoles.map((cr: any) => ({
+          id: cr.customRoleId || cr.roleId || cr.id,
+          name: cr.customRoleName || cr.roleName || cr.name
+        })));
+
+      } catch (error: any) {
+        console.error("Failed to load roles:", error);
+        toast.error("Failed to load roles data");
+      } finally {
         setIsLoadingData(false);
-      }, 600);
+      }
     };
+    
     initData();
   }, []);
 
@@ -139,16 +149,43 @@ export default function CreateApiKeyPage() {
     if (Object.keys(newErrors).length > 0) return;
 
     setIsSubmitting(true);
-    setTimeout(() => {
-        setIsSubmitting(false);
-        const newId = `mock-key-${Math.floor(Math.random() * 1000)}`;
-        setCreatedKeyId(newId);
+    
+    try {
+        const orgId = localStorage.getItem("orgId") || "temp";
+        const payload = {
+            KeyName: formData.keyName,               
+            KeyDescription: formData.description,    
+            CustomRoleId: formData.customRole ? formData.customRole : null,
+            Roles: rightRoles.map(r => r.name.toUpperCase()), 
+        };
+
+        const response: any = await apiKeyApi.addApiKey(orgId, payload);
         
-        // Generate Mock Token
-        const tokenStr = `sk_live_${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
-        setCreatedToken(tokenStr);
+        toast.success("API Key created successfully!");
+        
+        const newId = response?.apiKey?.keyId || response?.data?.apiKey?.keyId;
+        const newToken = response?.apiKey?.apiKey || response?.data?.apiKey?.apiKey || "NO_TOKEN_RETURNED";
+        
+        setCreatedKeyId(newId);
+        setCreatedToken(newToken);
+        
         setShowSuccessModal(true);
-    }, 1000);
+
+    } catch (error: any) {
+        console.error("Create API Key Error:", error);
+        
+        let errorMsg = "Failed to create API key";
+        if (error?.response?.data?.errors) {
+            const firstErrorKey = Object.keys(error.response.data.errors)[0];
+            errorMsg = error.response.data.errors[firstErrorKey][0];
+        } else {
+            errorMsg = error?.response?.data?.description || error?.message || errorMsg;
+        }
+
+        toast.error(errorMsg);
+    } finally {
+        setIsSubmitting(false);
+    }
   };
 
   const handleCopyToken = () => {
@@ -173,7 +210,7 @@ export default function CreateApiKeyPage() {
         <div className="flex-1 flex items-center justify-center text-slate-400">
           <div className="flex flex-col items-center gap-3">
             <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-            <span>Loading...</span> 
+            <span>Loading Data...</span> 
           </div>
         </div>
       </div>

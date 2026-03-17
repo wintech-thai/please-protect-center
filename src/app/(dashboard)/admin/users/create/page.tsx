@@ -181,14 +181,25 @@ export default function CreateUserPage() {
 
         const response: any = await userApi.inviteUserWithLink(orgId, payload);
         
+        const rawLink = response?.data?.registrationUrl || response?.registrationUrl || "";
+        let finalInviteLink = rawLink;
+
+        if (rawLink) {
+          const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN || "https://center-dev.please-protect.com";
+          
+          finalInviteLink = rawLink.replace(/https?:\/\/<REGISTER_SERVICE_DOMAIN>/, appDomain);
+          
+          if (finalInviteLink === rawLink) {
+             finalInviteLink = rawLink.replace("<REGISTER_SERVICE_DOMAIN>", appDomain.replace(/^https?:\/\//, ''));
+          }
+        }
+
         toast.success("Invitation sent successfully!");
         
         const newUserId = response?.data?.orgUser?.orgUserId || response?.orgUser?.orgUserId || formData.username;
         setCreatedUserId(newUserId);
         
-        const finalInviteLink = response?.data?.registrationUrl || response?.registrationUrl || "";
         setInviteLink(finalInviteLink);
-        
         setShowInviteModal(true);
 
       } catch (error: any) {

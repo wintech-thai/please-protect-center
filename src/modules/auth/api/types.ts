@@ -158,3 +158,27 @@ export interface GetUsersResponse {
   status?: string;
   message?: string;
 }
+
+export interface ApiKeyItem {
+  keyId?: string;
+  id?: string;
+  apiKeyName?: string;
+  apiKeyValue?: string;
+  description?: string;
+  isActive?: boolean | string;
+  createdDate?: string;
+  tags?: string | null;
+}
+
+export interface GetApiKeysPayload {
+  offset?: number;
+  limit?: number;
+  fullTextSearch?: string;
+}
+
+export interface GetApiKeysResponse {
+  data: ApiKeyItem[];
+  totalCount?: number;
+  status?: string;
+  message?: string;
+}

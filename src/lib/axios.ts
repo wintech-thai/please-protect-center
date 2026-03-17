@@ -1,4 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig, AxiosResponse } from "axios";
+import { toast } from "sonner"; 
 
 const API_URL = "/api/proxy";
 
@@ -65,9 +66,11 @@ client.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     if (typeof window !== "undefined") {
       const token = localStorage.getItem("accessToken");
-      const isLoginRequest = config.url?.toLowerCase().includes("login");
+      
+      const url = config.url?.toLowerCase() || "";
+      const isPublicPath = url.includes("login") || url.includes("registration");
 
-      if (token && config.headers && !isLoginRequest) {
+      if (token && config.headers && !isPublicPath) {
         const encodedToken = encodeBase64(token);
         config.headers.Authorization = `Bearer ${encodedToken}`;
       }
@@ -102,24 +105,33 @@ client.interceptors.response.use(
   },
   
   async (error: AxiosError) => {
-    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean, _retryCount?: number };
     const errorResponse = error.response;
     const errorData = errorResponse?.data as any;
     const status = errorResponse?.status;
     const businessCode = error.code; 
 
-    const isLoginRequest = originalRequest?.url?.toLowerCase().includes("login");
-    if (isLoginRequest) {
-        return Promise.reject(error);
+    const url = originalRequest?.url?.toLowerCase() || "";
+    const isPublicPath = url.includes("login") || url.includes("registration");
+
+    if (status === 429) {
+      originalRequest._retryCount = originalRequest._retryCount || 0;
+      if (originalRequest._retryCount < 3) {
+        originalRequest._retryCount += 1;
+        const waitTime = originalRequest._retryCount * 1000;
+        return new Promise((resolve) => {
+          setTimeout(() => resolve(client(originalRequest)), waitTime);
+        });
+      }
+      toast.error("Too many requests. Please wait.");
+      return Promise.reject({ ...error, isRateLimit: true });
     }
 
-    if (status === 403) {
-       const apiPath = originalRequest.url || "Unknown API"; 
-       const errorDesc = errorData?.description || "You do not have permission to access this resource.";
-       const finalMessage = `${errorDesc} (Target: ${apiPath})`;
+    if (isPublicPath) return Promise.reject(error);
 
+    if (status === 403) {
        const forbiddenError = new AxiosError(
-          finalMessage, "UNAUTHORIZED", originalRequest, error.request, errorResponse
+          "Access denied.", "UNAUTHORIZED", originalRequest, error.request, errorResponse
        );
        return Promise.reject(forbiddenError);
     }
@@ -153,13 +165,13 @@ client.interceptors.response.use(
 
     try {
       const refreshToken = localStorage.getItem("refreshToken");
+      const userName = localStorage.getItem("username") || "";
 
-      if (!refreshToken) {
-        throw new Error("No refresh token available");
-      }
+      if (!refreshToken) throw new Error("No refresh token");
 
       const res = await axios.post(`/api/proxy/api/Auth/org/temp/action/Refresh`, {
-        refreshToken,
+        userName: userName,
+        refreshToken: refreshToken,
       }, {
         headers: { "Content-Type": "application/json" }
       });
@@ -167,14 +179,10 @@ client.interceptors.response.use(
       const tokenData = res.data.token || res.data;
       const { access_token, refresh_token } = tokenData;
 
-      if (!access_token) {
-        throw new Error("Refresh failed: No access token received");
-      }
+      if (!access_token) throw new Error("No access token");
 
       localStorage.setItem("accessToken", access_token);
-      if (refresh_token) {
-        localStorage.setItem("refreshToken", refresh_token);
-      }
+      if (refresh_token) localStorage.setItem("refreshToken", refresh_token);
       setAuthCookies(access_token, refresh_token);
 
       processQueue(null, access_token);
@@ -189,20 +197,8 @@ client.interceptors.response.use(
     } catch (refreshError: any) {
       processQueue(refreshError, null);
       clearAuthData();
-
-      if (typeof window !== "undefined") {
-        window.location.href = "/login";
-      }
-      
-      const sessionError = new AxiosError(
-          "Session expired. Please login again.",
-          "INVALID_TOKEN",
-          originalRequest,
-          undefined,
-          undefined
-      );
-
-      return Promise.reject(sessionError);
+      if (typeof window !== "undefined") window.location.href = "/login";
+      return Promise.reject(refreshError);
     } finally {
       isRefreshing = false;
     }

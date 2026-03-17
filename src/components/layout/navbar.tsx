@@ -6,7 +6,6 @@ import {
   LogOut,
   Menu,
   ChevronDown,
-  Activity,
   Layers,
   Globe,
   Check,
@@ -33,12 +32,11 @@ import { ChangePasswordModal } from "@/src/components/modals/change-password-mod
 import { authApi } from "@/src/modules/auth/api/auth.api";
 import { toast } from "sonner"; 
 
-// --- Mock Data สำหรับ Organization Selector ---
-const mockOrganizations = [
-  { id: "napbiotec", name: "NAP BIOTEC" },
-  { id: "chalam", name: "Chalam Farm V1" },
-  { id: "rtarf", name: "RTARF HQ" },
-];
+// --- Interfaces ---
+interface OrgItem {
+  id: string;
+  name: string;
+}
 
 interface NavItem {
   label: string;
@@ -68,7 +66,9 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isOrgOpen, setIsOrgOpen] = useState(false);
-  const [selectedOrg, setSelectedOrg] = useState(mockOrganizations[0]);
+  
+  const [organizations, setOrganizations] = useState<OrgItem[]>([]);
+  const [selectedOrg, setSelectedOrg] = useState<OrgItem | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   
   const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
@@ -76,7 +76,7 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
   const profileDropdownRef = useRef<HTMLDivElement>(null);
   const orgDropdownRef = useRef<HTMLDivElement>(null);
 
-  const filteredOrgs = mockOrganizations.filter((org) =>
+  const filteredOrgs = organizations.filter((org) =>
     org.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -85,6 +85,41 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
       const storedUsername = localStorage.getItem("username");
       if (storedUsername) setUsername(storedUsername);
     }
+
+    const fetchOrganizations = async () => {
+      try {
+        const orgData = await authApi.getUserAllowedOrg();
+        
+        const mappedOrgs = orgData.map((o: any) => {
+          if (typeof o === "string") {
+            return { id: o, name: o.toUpperCase() }; 
+          }
+          return {
+            id: o.orgCustomId || o.orgId || o.id, 
+            name: o.orgName || o.orgCustomId || o.name || "Unknown Org"
+          };
+        });
+
+        setOrganizations(mappedOrgs);
+
+        const storedOrgId = localStorage.getItem("orgId");
+        if (storedOrgId && mappedOrgs.length > 0) {
+          const foundOrg = mappedOrgs.find((o: OrgItem) => o.id === storedOrgId);
+          if (foundOrg) setSelectedOrg(foundOrg);
+          else {
+            setSelectedOrg(mappedOrgs[0]);
+            localStorage.setItem("orgId", mappedOrgs[0].id);
+          }
+        } else if (mappedOrgs.length > 0) {
+          setSelectedOrg(mappedOrgs[0]);
+          localStorage.setItem("orgId", mappedOrgs[0].id);
+        }
+      } catch (error) {
+        console.error("Failed to fetch organizations:", error);
+      }
+    };
+
+    fetchOrganizations();
 
     const handleClickOutside = (event: MouseEvent) => {
       let clickedInsideMenu = false;
@@ -101,6 +136,58 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const handleOrgChange = async (org: OrgItem) => {
+    if (!org.id || org.id === "undefined") {
+      toast.error("Invalid Organization ID.");
+      console.error("Missing org ID in:", org);
+      return;
+    }
+
+    setSelectedOrg(org);
+    setIsOrgOpen(false);
+    setSearchQuery("");
+    
+    const loadingId = toast.loading(`Switching to ${org.name}...`);
+
+    try {
+      const refreshToken = localStorage.getItem("refreshToken");
+      const userName = localStorage.getItem("username") || "Admin";
+
+      if (refreshToken) {
+        const res = await authApi.refreshToken(org.id, { 
+          userName: userName, 
+          refreshToken: refreshToken 
+        });
+
+        const tokenData = res?.token || res?.data || res;
+        
+        if (tokenData?.access_token) {
+          localStorage.setItem("accessToken", tokenData.access_token);
+          document.cookie = `accessToken=${tokenData.access_token}; path=/; max-age=86400; SameSite=Lax`;
+        }
+        if (tokenData?.refresh_token) {
+          localStorage.setItem("refreshToken", tokenData.refresh_token);
+          document.cookie = `refreshToken=${tokenData.refresh_token}; path=/; max-age=604800; SameSite=Lax`;
+        }
+      }
+
+      localStorage.setItem("orgId", org.id);
+      document.cookie = `orgId=${org.id}; path=/; max-age=86400; SameSite=Lax`;
+      
+      toast.success(`Switched to ${org.name}`, { id: loadingId });
+      
+      window.location.reload(); 
+
+    } catch (error) {
+      console.error("Failed to switch org token:", error);
+      toast.error("Session expired or unauthorized for this Org.", { id: loadingId });
+      
+      setTimeout(() => {
+        handleLogout();
+      }, 1500);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -242,9 +329,12 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
               <button
                 onClick={() => setIsOrgOpen(!isOrgOpen)}
                 className="flex items-center gap-2 px-3 py-1.5 bg-[#162032]/80 border border-blue-900/50 rounded-lg hover:border-cyan-500/50 transition-colors group"
+                disabled={!selectedOrg} 
               >
                 <Building2 className="w-4 h-4 text-cyan-500" />
-                <span className="font-semibold text-white text-sm max-w-[120px] truncate">{selectedOrg.name}</span>
+                <span className="font-semibold text-white text-sm max-w-[120px] truncate">
+                  {selectedOrg ? selectedOrg.name : "Loading..."}
+                </span>
                 <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isOrgOpen ? "rotate-180" : ""}`} />
               </button>
 
@@ -253,16 +343,30 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
                   <div className="p-2 border-b border-blue-900/30">
                     <div className="relative">
                       <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                      <input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-[#162032] border border-blue-900/50 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500" />
+                      <input 
+                        type="text" 
+                        placeholder="Search..." 
+                        value={searchQuery} 
+                        onChange={(e) => setSearchQuery(e.target.value)} 
+                        className="w-full pl-9 pr-3 py-2 bg-[#162032] border border-blue-900/50 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500" 
+                      />
                     </div>
                   </div>
                   <div className="max-h-60 overflow-y-auto p-1 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
-                    {filteredOrgs.map((org) => (
-                      <button key={org.id} onClick={() => { setSelectedOrg(org); setIsOrgOpen(false); setSearchQuery(""); }} className={`w-full text-left px-3 py-2.5 rounded-lg text-sm mb-1 flex justify-between items-center transition-colors ${selectedOrg.id === org.id ? "bg-blue-600/20 text-cyan-400 font-semibold" : "text-slate-300 hover:bg-[#162032]"}`}>
-                        {org.name}
-                        {selectedOrg.id === org.id && <Check className="w-4 h-4 text-cyan-400" />}
-                      </button>
-                    ))}
+                    {filteredOrgs.length === 0 ? (
+                       <div className="px-3 py-4 text-center text-xs text-slate-500">No organizations found.</div>
+                    ) : (
+                      filteredOrgs.map((org, index) => (
+                        <button 
+                          key={`${org.id}-${index}`}
+                          onClick={() => handleOrgChange(org)} 
+                          className={`w-full text-left px-3 py-2.5 rounded-lg text-sm mb-1 flex justify-between items-center transition-colors ${selectedOrg?.id === org.id ? "bg-blue-600/20 text-cyan-400 font-semibold" : "text-slate-300 hover:bg-[#162032]"}`}
+                        >
+                          {org.name}
+                          {selectedOrg?.id === org.id && <Check className="w-4 h-4 text-cyan-400" />}
+                        </button>
+                      ))
+                    )}
                   </div>
                 </div>
               )}
@@ -290,7 +394,7 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
               )}
             </div>
 
-            {/* 🚀 2. ส่วนของ User Profile ที่มี Tooltip */}
+            {/* User Profile Tooltip & Menu */}
             <div className="relative hidden sm:block" ref={profileDropdownRef}>
               <TooltipProvider delayDuration={400}>
                 <Tooltip>
