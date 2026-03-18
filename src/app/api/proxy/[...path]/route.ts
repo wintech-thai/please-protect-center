@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import axios from "axios";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.BACKEND_URL;
+const API_BASE_URL = process.env.BACKEND_URL;
 
-async function handleProxy(
-  req: NextRequest,
-  { params }: { params: any } 
-) {
+async function handleProxy(req: NextRequest, { params }: { params: any }) {
   try {
     if (!API_BASE_URL) {
-      console.error("Proxy Error: API Base URL is not defined (missing NEXT_PUBLIC_API_URL or BACKEND_URL).");
+      console.error("Proxy Error: BACKEND_URL is not defined in environment variables.");
       return NextResponse.json(
         { message: "Server Configuration Error: Missing API URL" }, 
         { status: 500 }
@@ -19,12 +16,14 @@ async function handleProxy(
     const resolvedParams = await params;
     const pathArray = resolvedParams.path || resolvedParams.slug || []; 
     const endpoint = pathArray.join("/");
-    
     const queryParams = req.nextUrl.search; 
     
-    const targetUrl = `${API_BASE_URL}/${endpoint}${queryParams}`;
+    const cleanBaseUrl = API_BASE_URL.replace(/\/$/, "");
+    const cleanEndpoint = endpoint.replace(/^\//, "");
+    
+    const targetUrl = `${cleanBaseUrl}/${cleanEndpoint}${queryParams}`;
 
-    console.log(`Proxying [${req.method}] to: ${targetUrl}`);
+    console.log(`🚀 Proxying [${req.method}] to: ${targetUrl}`);
 
     let body: any = null;
     const contentType = req.headers.get("content-type");
