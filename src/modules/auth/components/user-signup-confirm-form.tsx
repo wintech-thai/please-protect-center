@@ -80,7 +80,7 @@ export function UserSignupConfirmForm({
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         
-        {/* Read Only Section */}
+        {/* Read Only */}
         <div className="space-y-4">
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-slate-300 ml-1">{t.username || "Username"}</label>
