@@ -12,7 +12,6 @@ const getEsClient = () => {
       password: process.env.ES_PASSWORD || '',
     },
     tls: { rejectUnauthorized: false },
-    
   });
 };
 
@@ -22,11 +21,12 @@ export async function POST(req: Request) {
     if (!orgId) return NextResponse.json({ status: "ERROR", message: "Missing Org ID" }, { status: 400 });
 
     const { esPayload } = await req.json();
-    const envRun = process.env.ENV_RUN || 'DEV';
+    
+    const envRun = process.env.ENV_RUN || 'Development';
 
     if (esPayload.query && esPayload.query.bool && esPayload.query.bool.must) {
-      esPayload.query.bool.must.push({ match: { "data.Environment": envRun } });
-      esPayload.query.bool.must.push({ match: { "data.api.OrgId": orgId } });
+      esPayload.query.bool.must.push({ match_phrase: { "data.Environment": envRun } });
+      esPayload.query.bool.must.push({ match: { "data.api.OrgId": orgId.toLowerCase() } });
     }
 
     const searchPayload: any = {

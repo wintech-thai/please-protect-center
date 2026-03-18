@@ -3,11 +3,12 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   Search, ChevronLeft, ChevronRight, Loader2, Eye, FileJson, X,
-  ChevronDown, RefreshCcw, Copy, Check, Clock
+  ChevronDown, RefreshCcw, Copy, Check
 } from "lucide-react";
 import { format, subMinutes, subHours, subDays } from "date-fns";
 import { toast } from "sonner";
 import { Navbar } from "@/src/components/layout/navbar"; 
+import { AdvancedTimeRangeSelector, type TimeRangeValue } from "@/src/components/ui/advanced-time-selector"; 
 
 export interface AuditLogDocument {
   id: string;
@@ -23,8 +24,6 @@ export interface AuditLogDocument {
   [key: string]: any;
 }
 
-type TimeRangeType = "5m" | "15m" | "30m" | "1h" | "3h" | "6h" | "12h" | "24h" | "2d" | "7d" | "30d";
-
 export default function AuditLogPage() {
   // --- States ---
   const [logs, setLogs] = useState<AuditLogDocument[]>([]);
@@ -36,7 +35,12 @@ export default function AuditLogPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [inputValue, setInputValue] = useState("");
   const [searchField, setSearchField] = useState("Full Text Search");
-  const [timeRange, setTimeRange] = useState<TimeRangeType>("24h");
+  
+  const [timeRange, setTimeRange] = useState<TimeRangeValue>({
+    type: "relative",
+    value: "24h",
+    label: "Last 24 hours"
+  });
 
   const [selectedLog, setSelectedLog] = useState<AuditLogDocument | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -100,28 +104,30 @@ export default function AuditLogPage() {
         }
       }
 
-      // Time Range Logic
       let gte: string | undefined;
+      let lte: string | undefined;
       const now = new Date();
-      let startTime = subHours(now, 24);
       
-      switch (timeRange) {
-          case "5m": startTime = subMinutes(now, 5); break;
-          case "15m": startTime = subMinutes(now, 15); break;
-          case "30m": startTime = subMinutes(now, 30); break;
-          case "1h": startTime = subHours(now, 1); break;
-          case "3h": startTime = subHours(now, 3); break;
-          case "6h": startTime = subHours(now, 6); break;
-          case "12h": startTime = subHours(now, 12); break;
-          case "24h": startTime = subHours(now, 24); break;
-          case "2d": startTime = subDays(now, 2); break;
-          case "7d": startTime = subDays(now, 7); break;
-          case "30d": startTime = subDays(now, 30); break;
+      if (timeRange.type === "absolute" && timeRange.start && timeRange.end) {
+        gte = new Date(timeRange.start * 1000).toISOString();
+        lte = new Date(timeRange.end * 1000).toISOString();
+      } else {
+        let startTime = subHours(now, 24);
+        const rangeValue = timeRange.value;
+        const num = parseInt(rangeValue.replace(/\D/g, "")) || 24;
+        const unit = rangeValue.replace(/\d/g, "") || "h";
+
+        if (unit === "m") startTime = subMinutes(now, num);
+        if (unit === "h") startTime = subHours(now, num);
+        if (unit === "d") startTime = subDays(now, num);
+        
+        gte = startTime.toISOString();
       }
-      gte = startTime.toISOString();
 
       if (gte) {
-        queryMust.push({ range: { "@timestamp": { gte } } });
+        const rangeQuery: any = { gte };
+        if (lte) rangeQuery.lte = lte;
+        queryMust.push({ range: { "@timestamp": rangeQuery } });
       }
 
       const payload = {
@@ -195,7 +201,7 @@ export default function AuditLogPage() {
     setInputValue("");
     setSearchTerm("");
     setSearchField("Full Text Search");
-    setTimeRange("24h");
+    setTimeRange({ type: "relative", value: "24h", label: "Last 24 hours" });
     setPage(1);
   };
   const openDetailModal = (log: AuditLogDocument) => {
@@ -265,30 +271,12 @@ export default function AuditLogPage() {
               </div>
 
               <div className="flex gap-2 w-full lg:w-auto justify-end">
-                  <div className="relative flex-1 sm:flex-none sm:min-w-[150px]">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <Clock className="w-4 h-4 text-slate-400" />
-                      </div>
-                      <select
-                          value={timeRange}
-                          onChange={(e) => { setTimeRange(e.target.value as TimeRangeType); setPage(1); }}
-                          disabled={isLoading}
-                          className="w-full appearance-none bg-[#162032] border border-blue-900/50 text-slate-300 text-sm rounded-lg pl-9 pr-8 py-2.5 focus:outline-none transition-colors disabled:opacity-50 cursor-pointer"
-                      >
-                          <option value="5m">Last 5 minutes</option>
-                          <option value="15m">Last 15 minutes</option>
-                          <option value="30m">Last 30 minutes</option>
-                          <option value="1h">Last 1 hour</option>
-                          <option value="3h">Last 3 hours</option>
-                          <option value="6h">Last 6 hours</option>
-                          <option value="12h">Last 12 hours</option>
-                          <option value="24h">Last 24 hours</option>
-                          <option value="2d">Last 2 days</option>
-                          <option value="7d">Last 7 days</option>
-                          <option value="30d">Last 30 days</option>
-                      </select>
-                      <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3 top-3.5 pointer-events-none" />
-                  </div>
+                  <AdvancedTimeRangeSelector 
+                    value={timeRange}
+                    onChange={(val) => { setTimeRange(val); setPage(1); }}
+                    disabled={isLoading}
+                  />
+
                   <button onClick={handleResetFilters} className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors flex items-center justify-center border border-slate-700">
                       <RefreshCcw className="w-4 h-4" />
                   </button>
@@ -321,22 +309,47 @@ export default function AuditLogPage() {
                           ) : (
                               logs.map((log, idx) => {
                                   const isSelected = selectedRowId === log.id;
+                                  
                                   const isError = log.status_code && log.status_code !== 200;
+                                  
                                   return (
                                       <tr 
                                           key={log.id || idx} 
                                           onClick={() => handleRowClick(log.id)}
-                                          className={`transition-all duration-300 group text-sm cursor-pointer hover:bg-blue-900/10 ${isSelected ? "bg-blue-900/20 border-l-4 border-l-cyan-400" : "border-l-4 border-l-transparent"}`}
+                                          className={`transition-all duration-300 group text-sm cursor-pointer 
+                                            ${isError ? "bg-red-500/10 hover:bg-red-500/20" : "hover:bg-blue-900/10"} 
+                                            ${isSelected && !isError ? "bg-blue-900/20 border-l-4 border-l-cyan-400" : ""}
+                                            ${isSelected && isError ? "bg-red-500/30 border-l-4 border-l-red-500" : ""}
+                                            ${!isSelected && isError ? "border-l-4 border-l-red-500/50" : ""}
+                                            ${!isSelected && !isError ? "border-l-4 border-l-transparent" : ""}
+                                          `}
                                       >
-                                          <td className="p-4 whitespace-nowrap text-slate-400 font-mono text-xs">{formatDate(log["@timestamp"])}</td>
-                                          <td className={`p-4 font-medium ${isError ? 'text-red-400' : 'text-blue-400'}`}>{log.user_name || "-"}</td>
-                                          <td className="p-4"><span className="text-slate-300">{log.id_type || "JWT"}</span></td>
-                                          <td className="p-4 text-slate-300">{log.action || "-"}</td>
-                                          <td className={`p-4 font-mono font-bold ${isError ? 'text-red-500' : 'text-slate-200'}`}>{log.status_code || 200}</td>
-                                          <td className="p-4 text-slate-400">{log.role || "-"}</td>
-                                          <td className="p-4 text-slate-500 font-mono text-xs">{log.client_ip || "-"}</td>
+                                          <td className={`p-4 whitespace-nowrap font-mono text-xs ${isError ? 'text-red-300' : 'text-slate-400'}`}>
+                                              {formatDate(log["@timestamp"])}
+                                          </td>
+                                          <td className={`p-4 font-medium ${isError ? 'text-red-400' : 'text-blue-400'}`}>
+                                              {log.user_name || "-"}
+                                          </td>
+                                          <td className="p-4">
+                                              <span className={isError ? 'text-red-200' : 'text-slate-300'}>{log.id_type || "JWT"}</span>
+                                          </td>
+                                          <td className={`p-4 ${isError ? 'text-red-200' : 'text-slate-300'}`}>
+                                              {log.action || "-"}
+                                          </td>
+                                          <td className={`p-4 font-mono font-bold ${isError ? 'text-red-500' : 'text-slate-200'}`}>
+                                              {log.status_code || 200}
+                                          </td>
+                                          <td className={`p-4 ${isError ? 'text-red-300' : 'text-slate-400'}`}>
+                                              {log.role || "-"}
+                                          </td>
+                                          <td className={`p-4 font-mono text-xs ${isError ? 'text-red-400' : 'text-slate-500'}`}>
+                                              {log.client_ip || "-"}
+                                          </td>
                                           <td className="p-4 text-center">
-                                              <button onClick={(e) => { e.stopPropagation(); openDetailModal(log); }} className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition-colors border border-transparent hover:border-slate-700 outline-none">
+                                              <button 
+                                                onClick={(e) => { e.stopPropagation(); openDetailModal(log); }} 
+                                                className={`p-1.5 rounded-full transition-colors border border-transparent outline-none ${isError ? 'text-red-400 hover:text-red-200 hover:bg-red-500/20 hover:border-red-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800 hover:border-slate-700'}`}
+                                              >
                                                   <Eye className="w-4 h-4" />
                                               </button>
                                           </td>
