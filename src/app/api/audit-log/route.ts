@@ -12,10 +12,7 @@ const getEsClient = () => {
       password: process.env.ES_PASSWORD || '',
     },
     tls: { rejectUnauthorized: false },
-    headers: {
-      'Accept': 'application/vnd.elasticsearch+json; compatible-with=8',
-      'Content-Type': 'application/vnd.elasticsearch+json; compatible-with=8'
-    }
+    
   });
 };
 

@@ -9,7 +9,7 @@ async function handleProxy(
 ) {
   try {
     if (!API_BASE_URL) {
-      console.error("🚨 Proxy Error: API Base URL is not defined (missing NEXT_PUBLIC_API_URL or BACKEND_URL).");
+      console.error("Proxy Error: API Base URL is not defined (missing NEXT_PUBLIC_API_URL or BACKEND_URL).");
       return NextResponse.json(
         { message: "Server Configuration Error: Missing API URL" }, 
         { status: 500 }
@@ -24,7 +24,7 @@ async function handleProxy(
     
     const targetUrl = `${API_BASE_URL}/${endpoint}${queryParams}`;
 
-    console.log(`🚀 Proxying [${req.method}] to: ${targetUrl}`);
+    console.log(`Proxying [${req.method}] to: ${targetUrl}`);
 
     let body: any = null;
     const contentType = req.headers.get("content-type");

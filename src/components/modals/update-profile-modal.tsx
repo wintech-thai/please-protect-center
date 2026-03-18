@@ -10,6 +10,22 @@ interface UpdateProfileModalProps {
   onClose: () => void;
 }
 
+const formatPhoneToE164 = (phone: string) => {
+  if (!phone) return phone;
+  
+  let cleaned = phone.replace(/[^\d+]/g, '');
+
+  if (cleaned.startsWith('0')) {
+    cleaned = '+66' + cleaned.substring(1);
+  }
+  
+  if (cleaned.startsWith('66') && !cleaned.startsWith('+66')) {
+    cleaned = '+' + cleaned;
+  }
+
+  return cleaned;
+};
+
 export function UpdateProfileModal({ isOpen, onClose }: UpdateProfileModalProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);     
@@ -82,17 +98,23 @@ export function UpdateProfileModal({ isOpen, onClose }: UpdateProfileModalProps)
     try {
       const orgId = localStorage.getItem("orgId") || "temp";
       
+      const formattedPhone = formatPhoneToE164(formData.phone);
+      
       const payload = {
         name: formData.firstName,
         lastName: formData.lastName,
-        phoneNumber: formData.phone,
+        phoneNumber: formattedPhone, 
         secondaryEmail: formData.secondaryEmail,
       };
 
       await profileApi.updateUserByUserName(orgId, formData.username, payload);
       
       toast.success("Profile updated successfully!");
-      setInitialData(formData); 
+      
+      const updatedData = { ...formData, phone: formattedPhone };
+      setFormData(updatedData);
+      setInitialData(updatedData); 
+      
       onClose();
     } catch (error: any) {
       console.error("Update profile error:", error);
