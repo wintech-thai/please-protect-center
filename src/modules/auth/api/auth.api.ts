@@ -14,11 +14,15 @@ export const authApi = {
   },
 
   refreshToken: async (orgId: string, payload: { userName: string, refreshToken: string }) => {
-    const response = await client.post(`/api/Auth/org/${orgId}/action/Refresh`, payload);
+    const body = {
+      ...payload,
+      orgId: orgId 
+    };
+    
+    const response = await client.post(`/api/Auth/org/temp/action/Refresh`, body);
     return response.data;
   },
 
-  
   getUserAllowedOrg: async (): Promise<string[]> => {
     const orgType = "PLEASE-PROTECT";
     const response = await client.get(`/api/OnlyUser/org/temp/action/GetUserAllowedOrganization/${orgType}`);
