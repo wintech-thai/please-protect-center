@@ -1,37 +1,32 @@
 "use client";
 
-import { useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
 import { Navbar } from "@/src/components/layout/navbar";
 import { ComingSoon } from "@/src/components/ui/coming-soon";
 
-// --- Mock Data ---
-const mockOrganizations = [
-  { id: "napbiotec", name: "NAP BIOTEC", shortName: "napbiotec" },
-  { id: "chalam", name: "Chalam Farm V1", shortName: "chalam-farm-v1" },
-  { id: "rtarf", name: "RTARF HQ", shortName: "rtarf-hq" },
-];
+// 🚀 1. Import Context และ Dictionary
+import { useLanguage } from "@/src/context/LanguageContext";
+import { translations } from "@/src/locales/dicts";
 
 export default function OverviewPage() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const [selectedOrg, setSelectedOrg] = useState(mockOrganizations[0]);
+  // 🚀 2. เรียกใช้งาน Language Hook
+  const { language } = useLanguage();
+  const t = translations.overview[language];
+  const tAudit = translations.auditLog[language]; // ดึงคำว่า Coming Soon จากหมวดอื่นมาใช้ร่วมกันได้ครับ
 
   return (
     <div className="flex flex-col h-screen bg-[#020617] text-blue-100 font-sans overflow-hidden">
-      
       <Navbar />
+      
       <main className="flex-1 flex flex-col relative overflow-hidden bg-[#020617] p-6">
         <div className="relative z-10 flex-1 flex flex-col items-center justify-center">
             
             <ComingSoon 
-              title="Dashboard Coming Soon" 
-              description="This feature is currently under development."
+              title={t.title} 
+              description={tAudit.description} 
             />
 
         </div>
       </main>
-      
     </div>
   );
 }

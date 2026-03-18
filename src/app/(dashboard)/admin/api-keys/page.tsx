@@ -17,15 +17,18 @@ import {
 } from "lucide-react";
 import { Navbar } from "@/src/components/layout/navbar"; 
 import { toast } from "sonner";
-
-// 🚀 Import APIs
 import { apiKeyApi } from "@/src/modules/auth/api/api-key.api"; 
 import { roleApi } from "@/src/modules/auth/api/role.api";
+import { useLanguage } from "@/src/context/LanguageContext";
+import { translations } from "@/src/locales/dicts";
 
 export default function ApiKeysPage() {
   const pathname = usePathname(); 
   const searchParams = useSearchParams();
   const highlightIdParam = searchParams.get("highlight");
+
+  const { language } = useLanguage();
+  const t = translations.apiKeys[language]; 
 
   // States
   const [keys, setKeys] = useState<any[]>([]);
@@ -117,7 +120,7 @@ export default function ApiKeysPage() {
 
     } catch (error: any) {
       console.error("Fetch API Keys Error:", error);
-      toast.error("Failed to load API keys");
+      toast.error(t.toast.fetchError); 
     } finally {
       setIsLoading(false);
     }
@@ -142,35 +145,39 @@ export default function ApiKeysPage() {
         await apiKeyApi.deleteApiKeyById(orgId, id); 
       }
       
-      toast.success("Successfully revoked API key(s).");
+      toast.success(t.toast.deleteSuccess.replace("{count}", selectedIds.length.toString()));
       setSelectedIds([]);
       setShowDeleteConfirm(false);
       
       fetchApiKeysData(page, searchTerm);
     } catch (error: any) {
       console.error("Delete API key error:", error);
-      const errorMsg = error?.response?.data?.description || error?.message || "Failed to revoke key(s)";
+      const errorMsg = error?.response?.data?.description || error?.message || t.toast.deleteError; 
       toast.error(errorMsg);
     }
   };
 
   const handleToggleStatus = async (id: string, currentStatus: string) => {
     const orgId = localStorage.getItem("orgId") || "temp";
-    const toastId = toast.loading(`${currentStatus === 'Active' ? 'Disabling' : 'Enabling'} API key...`);
+    const loadingMessage = currentStatus === 'Active' 
+        ? `${t.buttons.disable.replace(" Key", "ing")}...` 
+        : `${t.buttons.enable.replace(" Key", "ing")}...`;
+    
+    const toastId = toast.loading(loadingMessage);
     
     try {
       if (currentStatus === 'Active') {
         await apiKeyApi.disableApiKeyById(orgId, id);
-        toast.success("API key disabled successfully.", { id: toastId });
+        toast.success(t.toast.statusSuccess, { id: toastId }); 
       } else {
         await apiKeyApi.enableApiKeyById(orgId, id);
-        toast.success("API key enabled successfully.", { id: toastId });
+        toast.success(t.toast.statusSuccess, { id: toastId }); 
       }
       
       fetchApiKeysData(page, searchTerm);
     } catch (error: any) {
       console.error("Toggle status error:", error);
-      const errorMsg = error?.response?.data?.description || error?.message || "Failed to change status.";
+      const errorMsg = error?.response?.data?.description || error?.message || t.toast.statusError; 
       toast.error(errorMsg, { id: toastId });
     }
   };
@@ -198,8 +205,8 @@ export default function ApiKeysPage() {
         <div className="flex-none pt-6 px-6 mb-2">
           <div className="flex items-center gap-4">
               <div>
-                  <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">API Keys</h1>
-                  <p className="text-slate-400 text-xs md:text-sm">Manage API access keys and permissions</p>
+                  <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">{t.title}</h1> 
+                  <p className="text-slate-400 text-xs md:text-sm">{t.subHeader}</p> 
               </div>
           </div>
         </div>
@@ -210,14 +217,14 @@ export default function ApiKeysPage() {
               <div className="flex flex-col sm:flex-row w-full lg:w-auto gap-2">
                   <div className="relative w-full sm:w-auto sm:min-w-[160px]">
                       <select className="w-full appearance-none bg-[#162032] border border-blue-900/50 text-slate-200 text-sm rounded-lg pl-3 pr-8 py-2.5 focus:outline-none focus:border-cyan-500 transition-colors cursor-pointer">
-                          <option>Full Text Search</option>
+                          <option>{t.filters.all}</option> 
                       </select>
                       <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3 top-3 pointer-events-none" />
                   </div>
                   <div className="relative w-full sm:w-auto sm:flex-1 lg:min-w-[240px]">
                       <input 
                         type="text" 
-                        placeholder="Search API keys..." 
+                        placeholder={t.searchPlaceholder} 
                         value={searchTerm}                         
                         onChange={(e) => setSearchTerm(e.target.value)} 
                         onKeyDown={(e) => e.key === "Enter" && handleSearchTrigger()}
@@ -237,14 +244,14 @@ export default function ApiKeysPage() {
                     href={selectedRowId ? `/admin/api-keys/create?prevHighlight=${selectedRowId}` : "/admin/api-keys/create"} 
                     className="flex-1 lg:flex-none"
                   >
-                      <button className="w-full justify-center px-8 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg uppercase transition-all shadow-lg shadow-blue-900/20">Add</button>
+                      <button className="w-full justify-center px-8 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg uppercase transition-all shadow-lg shadow-blue-900/20">{t.buttons.add}</button> {/* 🚀 ใช้คำแปล */}
                   </Link>
                   <button 
                     onClick={() => setShowDeleteConfirm(true)}
                     disabled={selectedIds.length === 0}
                     className="flex-1 lg:flex-none justify-center px-8 py-2.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/50 text-sm font-semibold rounded-lg uppercase transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                   >
-                      Delete
+                      {t.buttons.delete} 
                   </button>
               </div>
           </div>
@@ -258,19 +265,19 @@ export default function ApiKeysPage() {
                       <thead className="bg-[#020617] sticky top-0 z-10 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-blue-900/50">
                           <tr>
                               <th className="p-4 w-[50px] text-center"><input type="checkbox" onChange={handleSelectAll} checked={keys.length > 0 && selectedIds.length === keys.length} className="rounded border-slate-700 bg-slate-800" /></th>
-                              <th className="p-4 px-6">Key Name</th>
-                              <th className="p-4 px-6">Description</th>
-                              <th className="p-4 px-6">Custom Role</th>
-                              <th className="p-4 px-6">Roles</th>
-                              <th className="p-4 px-6">Status</th>
-                              <th className="p-4 px-6 text-center">Action</th>
+                              <th className="p-4 px-6">{t.columns.keyName}</th> 
+                              <th className="p-4 px-6">{t.columns.description}</th> 
+                              <th className="p-4 px-6">{t.columns.customRole}</th> 
+                              <th className="p-4 px-6">{t.columns.roles}</th> 
+                              <th className="p-4 px-6">{t.columns.status}</th> 
+                              <th className="p-4 px-6 text-center">{t.columns.action}</th> 
                           </tr>
                       </thead>
                       <tbody className="divide-y divide-blue-900/20">
                           {isLoading ? (
-                              <tr><td colSpan={7} className="p-20 text-center text-slate-500 animate-pulse">Loading API keys...</td></tr>
+                              <tr><td colSpan={7} className="p-20 text-center text-slate-500 animate-pulse">{t.loading}</td></tr> /* 🚀 ใช้คำแปล */
                           ) : keys.length === 0 ? (
-                              <tr><td colSpan={7} className="p-20 text-center text-slate-500 font-medium italic">No API keys found.</td></tr>
+                              <tr><td colSpan={7} className="p-20 text-center text-slate-500 font-medium italic">{t.noData}</td></tr> /* 🚀 ใช้คำแปล */
                           ) : (
                               keys.map((apiKey) => {
                                   const isSelected = selectedRowId === apiKey.id;
@@ -343,7 +350,7 @@ export default function ApiKeysPage() {
                                                             : 'text-slate-500 cursor-not-allowed opacity-60'
                                                         }`}
                                                     >
-                                                        Disable Key
+                                                        {t.buttons.disable} 
                                                     </button>
 
                                                     {/* ปุ่ม Enable */}
@@ -362,7 +369,7 @@ export default function ApiKeysPage() {
                                                             : 'text-slate-500 cursor-not-allowed opacity-60'
                                                         }`}
                                                     >
-                                                        Enable Key
+                                                        {t.buttons.enable} 
                                                     </button>
 
                                                 </div>
@@ -378,7 +385,7 @@ export default function ApiKeysPage() {
               
               <div className="flex-none flex items-center justify-between sm:justify-end px-6 py-4 border-t border-blue-900/50 bg-[#020617] z-20 gap-4 sm:gap-6">
                   <div className="flex items-center gap-2 text-sm text-slate-400">
-                      <span>Rows per page</span>
+                      <span>{t.rowsPerPage}</span> 
                       <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setPage(1); }} className="bg-transparent border-none text-slate-200 focus:ring-0 cursor-pointer font-medium outline-none">
                           <option value={25} className="bg-[#0B1120]">25</option>
                           <option value={50} className="bg-[#0B1120]">50</option>
@@ -387,7 +394,7 @@ export default function ApiKeysPage() {
                       </select>
                   </div>
                   <div className="flex items-center gap-4">
-                      <div className="text-xs text-slate-400">{totalCount === 0 ? '0-0' : `${startRow}-${endRow}`} of {totalCount}</div>
+                      <div className="text-xs text-slate-400">{totalCount === 0 ? '0-0' : `${startRow}-${endRow}`} {t.of} {totalCount}</div> 
                       <div className="flex items-center gap-1">
                           <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1 || isLoading} className="p-1.5 rounded hover:bg-blue-900/40 text-slate-400 disabled:opacity-30 transition-colors"><ChevronLeft className="w-5 h-5" /></button>
                           <button onClick={() => setPage(p => Math.min(Math.ceil(totalCount/itemsPerPage), p + 1))} disabled={page >= Math.ceil(totalCount/itemsPerPage) || totalCount === 0 || isLoading} className="p-1.5 rounded hover:bg-blue-900/40 text-slate-400 disabled:opacity-30 transition-colors"><ChevronRight className="w-5 h-5" /></button>
@@ -403,11 +410,17 @@ export default function ApiKeysPage() {
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
             <div className="bg-[#0B1120] border border-blue-900/50 rounded-xl shadow-2xl w-full max-w-sm p-6 text-center">
                 <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/20 text-red-500"><Trash2 className="w-6 h-6" /></div>
-                <h3 className="text-lg font-bold text-white mb-2 uppercase">Revoke API Key</h3>
-                <p className="text-sm text-slate-400 mb-6 font-medium leading-relaxed px-2">Are you sure you want to revoke {selectedIds.length} key(s)? Integrations using this key will immediately fail.</p>
+                <h3 className="text-lg font-bold text-white mb-2 uppercase">{t.modal.deleteTitle}</h3> 
+                <p className="text-sm text-slate-400 mb-6 font-medium leading-relaxed px-2">
+                  {t.modal.deleteMessage.replace("{count}", selectedIds.length.toString())}
+                </p>
                 <div className="flex gap-3">
-                    <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-800 rounded-lg transition-colors border border-slate-700">Cancel</button>
-                    <button onClick={handleBulkDelete} className="flex-1 py-2.5 text-sm font-medium bg-red-600 hover:bg-red-500 text-white rounded-lg transition-all shadow-lg shadow-red-900/20 font-bold uppercase">Revoke Now</button>
+                    <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-800 rounded-lg transition-colors border border-slate-700">
+                      {t.buttons.cancel} 
+                    </button>
+                    <button onClick={handleBulkDelete} className="flex-1 py-2.5 text-sm font-medium bg-red-600 hover:bg-red-500 text-white rounded-lg transition-all shadow-lg shadow-red-900/20 font-bold uppercase">
+                      {t.buttons.delete} 
+                    </button>
                 </div>
             </div>
         </div>

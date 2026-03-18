@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import { Toaster } from "sonner";
 import "./globals.css";
 
+import { LanguageProvider } from "@/src/context/LanguageContext";
 
 const prompt = localFont({
   src: [
@@ -42,7 +43,8 @@ export default function RootLayout({
           selection:bg-cyan-500/30
         `}
       >
-        {/* <LanguageProvider> */}
+        <LanguageProvider>
+          
           {/* <QueryProvider> */}
             {/* <NuqsAdapter> */}
               
@@ -60,7 +62,7 @@ export default function RootLayout({
             style={{ fontFamily: 'var(--font-prompt)' }}
           />
 
-        {/* </LanguageProvider> */}
+        </LanguageProvider>
       </body>
     </html>
   );

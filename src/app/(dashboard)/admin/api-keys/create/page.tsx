@@ -18,6 +18,8 @@ import { Navbar } from "@/src/components/layout/navbar";
 import { toast } from "sonner"; 
 import { roleApi } from "@/src/modules/auth/api/role.api";
 import { apiKeyApi } from "@/src/modules/auth/api/api-key.api";
+import { useLanguage } from "@/src/context/LanguageContext";
+import { translations } from "@/src/locales/dicts";
 
 interface RoleItem {
   id: string;
@@ -29,6 +31,9 @@ export default function CreateApiKeyPage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  const { language } = useLanguage();
+  const t = translations.createApiKey[language];
 
   const [returnToId, setReturnToId] = useState<string | null>(null);
   const [createdKeyId, setCreatedKeyId] = useState<string | null>(null);
@@ -103,14 +108,14 @@ export default function CreateApiKeyPage() {
 
       } catch (error: any) {
         console.error("Failed to load roles:", error);
-        toast.error("Failed to load roles data");
+        toast.error(t.toast.rolesError); 
       } finally {
         setIsLoadingData(false);
       }
     };
     
     initData();
-  }, []);
+  }, [t.toast.rolesError]);
 
   const handleCheck = (id: string, side: "left" | "right") => {
     if (side === "left") {
@@ -142,8 +147,8 @@ export default function CreateApiKeyPage() {
 
   const handleSubmit = async () => {
     const newErrors: { [key: string]: string } = {};
-    if (!formData.keyName.trim()) newErrors.keyName = "Key Name is required"; 
-    if (!formData.description.trim()) newErrors.description = "Description is required";
+    if (!formData.keyName.trim()) newErrors.keyName = t.validation.keyName; 
+    if (!formData.description.trim()) newErrors.description = t.validation.description;
     
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) return;
@@ -161,7 +166,7 @@ export default function CreateApiKeyPage() {
 
         const response: any = await apiKeyApi.addApiKey(orgId, payload);
         
-        toast.success("API Key created successfully!");
+        toast.success(t.toast.success); 
         
         const newId = response?.apiKey?.keyId || response?.data?.apiKey?.keyId;
         const newToken = response?.apiKey?.apiKey || response?.data?.apiKey?.apiKey || "NO_TOKEN_RETURNED";
@@ -174,12 +179,16 @@ export default function CreateApiKeyPage() {
     } catch (error: any) {
         console.error("Create API Key Error:", error);
         
-        let errorMsg = "Failed to create API key";
+        let errorMsg = t.toast.error; 
         if (error?.response?.data?.errors) {
             const firstErrorKey = Object.keys(error.response.data.errors)[0];
             errorMsg = error.response.data.errors[firstErrorKey][0];
         } else {
             errorMsg = error?.response?.data?.description || error?.message || errorMsg;
+        }
+
+        if (errorMsg.includes("already in use") || errorMsg.includes("Duplicate")) {
+            errorMsg = t.toast.duplicateKeyName.replace("{name}", formData.keyName);
         }
 
         toast.error(errorMsg);
@@ -191,6 +200,7 @@ export default function CreateApiKeyPage() {
   const handleCopyToken = () => {
     navigator.clipboard.writeText(createdToken);
     setIsCopied(true);
+    toast.success(t.toast.copySuccess); 
     setTimeout(() => setIsCopied(false), 2000);
   };
 
@@ -210,7 +220,7 @@ export default function CreateApiKeyPage() {
         <div className="flex-1 flex items-center justify-center text-slate-400">
           <div className="flex flex-col items-center gap-3">
             <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-            <span>Loading Data...</span> 
+            <span>{t.loading}</span> 
           </div>
         </div>
       </div>
@@ -231,8 +241,8 @@ export default function CreateApiKeyPage() {
                 <ChevronLeft className="w-5 h-5" />
             </button>
             <div>
-                <h1 className="text-2xl font-bold text-white tracking-tight">Create API Key</h1>
-                <p className="text-slate-400 text-sm mt-0.5">Generate a new authentication key for system integrations</p>
+                <h1 className="text-2xl font-bold text-white tracking-tight">{t.title}</h1> 
+                <p className="text-slate-400 text-sm mt-0.5">{t.subHeader}</p> 
             </div>
         </div>
       </div>
@@ -245,14 +255,14 @@ export default function CreateApiKeyPage() {
             <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 shadow-sm">
                 <h2 className="text-base font-semibold text-white mb-6 flex items-center gap-2 border-b border-slate-800 pb-3">
                     <span className="w-1 h-5 bg-blue-500 rounded-full"></span>
-                    Key Information
+                    {t.infoTitle} 
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-300">Key Name <span className="text-red-400">*</span></label>
+                        <label className="text-sm font-medium text-slate-300">{t.labels.keyName} <span className="text-red-400">*</span></label> {/* 🚀 ใช้คำแปล */}
                         <input 
                             type="text" 
-                            placeholder="e.g. Sentinel-Integration-01"
+                            placeholder={t.placeholders.keyName} 
                             value={formData.keyName}
                             onChange={e => setFormData({...formData, keyName: e.target.value})}
                             className={`w-full bg-slate-950 border ${errors.keyName ? 'border-red-500/50 focus:border-red-500' : 'border-slate-700 focus:border-blue-500'} rounded-lg px-4 py-2.5 text-slate-200 outline-none transition-all placeholder:text-slate-600 text-sm`}
@@ -260,10 +270,10 @@ export default function CreateApiKeyPage() {
                         {errors.keyName && <p className="text-red-400 text-xs">{errors.keyName}</p>}
                     </div>
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-300">Description <span className="text-red-400">*</span></label>
+                        <label className="text-sm font-medium text-slate-300">{t.labels.description} <span className="text-red-400">*</span></label> {/* 🚀 ใช้คำแปล */}
                         <input 
                             type="text" 
-                            placeholder="What is this key used for?"
+                            placeholder={t.placeholders.description} 
                             value={formData.description}
                             onChange={e => setFormData({...formData, description: e.target.value})}
                             className={`w-full bg-slate-950 border ${errors.description ? 'border-red-500/50 focus:border-red-500' : 'border-slate-700 focus:border-blue-500'} rounded-lg px-4 py-2.5 text-slate-200 outline-none transition-all placeholder:text-slate-600 text-sm`}
@@ -277,20 +287,20 @@ export default function CreateApiKeyPage() {
             <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 shadow-sm">
                 <h2 className="text-base font-semibold text-white mb-6 flex items-center gap-2 border-b border-slate-800 pb-3">
                     <span className="w-1 h-5 bg-purple-500 rounded-full"></span>
-                    Roles & Permissions
+                    {t.rolesTitle}
                 </h2>
                 
                 <div className="mb-6 max-w-xl">
-                    <label className="text-sm font-medium text-slate-300 mb-2 block">Custom Role Template (Optional)</label>
+                    <label className="text-sm font-medium text-slate-300 mb-2 block">{t.labels.customRole}</label> {/* 🚀 ใช้คำแปล */}
                     <div className="relative">
                         <select 
                             value={formData.customRole}
                             onChange={e => setFormData({...formData, customRole: e.target.value})}
                             className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 appearance-none outline-none focus:border-blue-500 transition-all cursor-pointer text-sm"
                         >
-                            <option value="">Select a custom role...</option>
-                            {customRolesList.map(role => (
-                                <option key={role.id} value={role.id}>{role.name}</option>
+                            <option value="">{t.labels.selectRole}</option> 
+                            {customRolesList.map((role, index) => (
+                                <option key={role.id || `custom-role-${index}`} value={role.id}>{role.name}</option>
                             ))}
                         </select>
                         <div className="absolute right-4 top-3.5 pointer-events-none text-slate-500">
@@ -301,18 +311,18 @@ export default function CreateApiKeyPage() {
 
                 {/* System Roles Transfer List */}
                 <div>
-                    <h3 className="text-sm font-medium text-slate-300 mb-3">System Roles Assignment</h3>
+                    <h3 className="text-sm font-medium text-slate-300 mb-3">{t.labels.systemRoles}</h3> 
                     <div className="flex flex-col md:flex-row gap-4 items-center">
                         
                         {/* Available Roles (Left) */}
                         <div className="flex-1 w-full bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex flex-col h-[320px]">
                             <div className="px-4 py-3 bg-slate-900/80 border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider flex justify-between items-center">
-                                <span>Available Roles</span>
+                                <span>{t.labels.availableRoles}</span> 
                                 <span className="bg-slate-800 px-2 py-0.5 rounded text-[10px] text-slate-500">{leftRoles.length}</span>
                             </div>
                             <div className="p-2 overflow-y-auto flex-1 custom-scrollbar space-y-1">
                                 {leftRoles.length === 0 ? (
-                                    <div className="h-full flex items-center justify-center text-slate-600 text-xs opacity-70">No roles available</div>
+                                    <div className="h-full flex items-center justify-center text-slate-600 text-xs opacity-70">{t.noRolesAvailable}</div>
                                 ) : (
                                     leftRoles.map(role => (
                                         <div 
@@ -346,14 +356,14 @@ export default function CreateApiKeyPage() {
                         {/* Selected Roles (Right) */}
                         <div className="flex-1 w-full bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex flex-col h-[320px]">
                             <div className="px-4 py-3 bg-slate-900/80 border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider flex justify-between items-center">
-                                <span>Selected Roles</span>
+                                <span>{t.labels.selectedRoles}</span> 
                                 <span className="bg-slate-800 px-2 py-0.5 rounded text-[10px] text-slate-500">{rightRoles.length}</span>
                             </div>
                             <div className="p-2 overflow-y-auto flex-1 custom-scrollbar space-y-1">
                                 {rightRoles.length === 0 ? (
                                     <div className="h-full flex flex-col items-center justify-center text-slate-600 opacity-50 space-y-2">
                                         <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center border border-slate-800"><ChevronRight className="w-5 h-5 text-slate-700" /></div>
-                                        <span className="text-[13px] font-medium">No roles selected</span>
+                                        <span className="text-[13px] font-medium">{t.noRolesSelected}</span> 
                                     </div>
                                 ) : (
                                     rightRoles.map(role => (
@@ -383,15 +393,15 @@ export default function CreateApiKeyPage() {
 
       {/* Footer Buttons */}
       <div className="flex-none p-4 md:px-8 border-t border-slate-800 bg-slate-950 flex justify-end gap-3 z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-            <button onClick={handleCancel} className="px-6 py-2.5 rounded-lg border border-red-500/50 text-red-500 hover:bg-red-500/10 transition-all font-medium text-sm">
-                Cancel
+            <button onClick={handleCancel} className="px-6 py-2.5 rounded-lg border border-red-500/50 text-red-500 hover:bg-red-500/10 transition-all font-medium text-sm uppercase">
+                {t.buttons.cancel} 
             </button>
             <button 
                 onClick={handleSubmit} 
                 disabled={isSubmitting} 
-                className="px-8 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 transition-all font-medium text-sm flex items-center justify-center gap-2 min-w-[100px]"
+                className="px-8 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 transition-all font-medium text-sm flex items-center justify-center gap-2 min-w-[100px] uppercase"
             >
-                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : t.buttons.save} 
             </button>
       </div>
 
@@ -401,8 +411,8 @@ export default function CreateApiKeyPage() {
             <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md p-6 transform scale-100 animate-in zoom-in-95 duration-300 relative overflow-hidden">
                 <div className="flex flex-col items-center text-center">
                     <div className="w-14 h-14 bg-green-500/10 rounded-full flex items-center justify-center mb-4 border border-green-500/20"><Key className="w-7 h-7 text-green-400" /></div>
-                    <h3 className="text-xl font-bold text-white mb-1">API Key Created!</h3>
-                    <p className="text-sm text-slate-400 mb-6 px-4 leading-relaxed">Please copy this key now. You will not be able to see it again.</p>
+                    <h3 className="text-xl font-bold text-white mb-1">{t.modal.successTitle}</h3> 
+                    <p className="text-sm text-slate-400 mb-6 px-4 leading-relaxed">{t.modal.successMessage}</p> 
                     
                     <div className="w-full bg-slate-950 border border-slate-800 rounded-lg p-1.5 flex items-center gap-2 mb-6 shadow-inner">
                         <div className="flex-1 bg-transparent px-3 text-sm text-yellow-400 font-mono select-all text-left break-all">{createdToken}</div>
@@ -410,8 +420,8 @@ export default function CreateApiKeyPage() {
                             {isCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                         </button>
                     </div>
-                    <button onClick={handleFinish} className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium shadow-lg shadow-blue-500/20 transition-all">
-                        Done
+                    <button onClick={handleFinish} className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium shadow-lg shadow-blue-500/20 transition-all uppercase">
+                        {t.buttons.done} 
                     </button>
                 </div>
             </div>
@@ -423,11 +433,15 @@ export default function CreateApiKeyPage() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200 px-4">
             <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-sm p-6 text-center">
                 <div className="w-14 h-14 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4 border border-red-500/20"><AlertTriangle className="w-8 h-8 text-red-500" /></div>
-                <h3 className="text-lg font-bold text-white">Discard Changes?</h3>
-                <p className="text-sm text-slate-400 mt-2 mb-6">You have unsaved information. Are you sure you want to leave?</p>
+                <h3 className="text-lg font-bold text-white">{t.modal.title}</h3> 
+                <p className="text-sm text-slate-400 mt-2 mb-6">{t.modal.message}</p> 
                 <div className="flex justify-end gap-3 w-full">
-                    <button onClick={() => setShowExitDialog(false)} className="flex-1 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 rounded-lg transition-colors">Stay</button>
-                    <button onClick={() => goBack()} className="flex-1 px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-500 text-white rounded-lg shadow-lg transition-all">Discard</button>
+                    <button onClick={() => setShowExitDialog(false)} className="flex-1 px-4 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-800 rounded-lg transition-colors border border-slate-700 uppercase">
+                        {t.buttons.stay} 
+                    </button>
+                    <button onClick={() => goBack()} className="flex-1 px-4 py-2.5 text-sm font-medium bg-red-600 hover:bg-red-500 text-white rounded-lg shadow-lg shadow-red-500/20 transition-all uppercase">
+                        {t.buttons.leave} 
+                    </button>
                 </div>
             </div>
         </div>

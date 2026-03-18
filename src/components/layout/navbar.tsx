@@ -3,34 +3,18 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  LogOut,
-  Menu,
-  ChevronDown,
-  Layers,
-  Globe,
-  Check,
-  User,
-  Lock,
-  Users,
-  Key,
-  FileText,
-  ShieldAlert,
-  PanelLeft,
-  Building2,
-  Search
+  LogOut, Menu, ChevronDown, Layers, Globe, Check, User, Lock, Users, Key, FileText, ShieldAlert, PanelLeft, Building2, Search
 } from "lucide-react";
 import { useState, useMemo, useEffect, useRef } from "react";
-import { 
-  Tooltip, 
-  TooltipTrigger, 
-  TooltipContent, 
-  TooltipProvider 
-} from "@/src/components/ui/tooltip";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/src/components/ui/tooltip";
 
 import { UpdateProfileModal } from "@/src/components/modals/update-profile-modal";
 import { ChangePasswordModal } from "@/src/components/modals/change-password-modal";
 import { authApi } from "@/src/modules/auth/api/auth.api";
 import { toast } from "sonner"; 
+
+import { useLanguage } from "@/src/context/LanguageContext";
+import { translations } from "@/src/locales/dicts";
 
 // --- Interfaces ---
 interface OrgItem {
@@ -52,14 +36,13 @@ interface NavbarProps {
 export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  
-  // States สำหรับ UI
+  const { language, setLanguage } = useLanguage();
+  const t = translations.navbar[language];
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
-  
   const [username, setUsername] = useState<string | null>("Admin"); 
-  const [language, setLanguage] = useState("EN"); 
 
   // States สำหรับ Custom Dropdowns
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
@@ -205,7 +188,7 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
       document.cookie = "user_name=; path=/; max-age=0; SameSite=Lax";
       document.cookie = "orgId=; path=/; max-age=0; SameSite=Lax";
 
-      toast.success("Logout successful", {
+      toast.success(t.logoutSuccess, {
         duration: 2000,
       });
 
@@ -217,23 +200,23 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
 
   const navItems: NavItem[] = useMemo(() => [
     { 
-      label: "Overview",
+      label: t.overview,
       href: "/overview",
       children: [
-        { label: "System Overview", href: "/overview", icon: <Layers className="w-4 h-4 mr-2" /> },
+        { label: t.systemOverview, href: "/overview", icon: <Layers className="w-4 h-4 mr-2" /> },
       ]
     },
     {
-      label: "Administrator",
+      label: t.administrator,
       href: "/admin/users",
       children: [
-        { label: "Custom Roles", href: "/admin/custom-roles", icon: <ShieldAlert className="w-4 h-4 mr-2" /> },
-        { label: "Users", href: "/admin/users", icon: <Users className="w-4 h-4 mr-2" /> },
-        { label: "API Keys", href: "/admin/api-keys", icon: <Key className="w-4 h-4 mr-2" /> },
-        { label: "Audit Logs", href: "/admin/audit-log", icon: <FileText className="w-4 h-4 mr-2" /> },
+        { label: t.roles, href: "/admin/custom-roles", icon: <ShieldAlert className="w-4 h-4 mr-2" /> },
+        { label: t.users, href: "/admin/users", icon: <Users className="w-4 h-4 mr-2" /> },
+        { label: t.apiKeys, href: "/admin/api-keys", icon: <Key className="w-4 h-4 mr-2" /> },
+        { label: t.audit, href: "/admin/audit-log", icon: <FileText className="w-4 h-4 mr-2" /> },
       ]
     }
-  ], []);
+  ], [t]); 
 
   const isActive = (path: string) => {
     if (path === "/overview") return pathname === path;
@@ -418,13 +401,13 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
               {isProfileDropdownOpen && (
                 <div className="absolute right-0 top-full mt-2 w-[200px] p-1 bg-[#0B1120] border border-blue-900/30 shadow-2xl rounded-lg text-blue-100 animate-in fade-in slide-in-from-top-2">
                   <button onClick={() => { setShowProfileModal(true); setIsProfileDropdownOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-sm rounded-md text-slate-300 hover:bg-blue-900/40 hover:text-cyan-400 transition-colors">
-                    <User className="w-4 h-4" /> <span>Profile</span>
+                    <User className="w-4 h-4" /> <span>{t.profile}</span>
                   </button>
                   <button onClick={() => { setShowPasswordModal(true); setIsProfileDropdownOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2.5 text-sm rounded-md text-slate-300 hover:bg-blue-900/40 hover:text-cyan-400 transition-colors">
-                    <Lock className="w-4 h-4" /> <span>Change Password</span>
+                    <Lock className="w-4 h-4" /> <span>{t.changePassword}</span>
                   </button>
                   <button onClick={handleLogout} className="w-full flex items-center gap-2 px-3 py-2.5 text-sm rounded-md text-red-400 hover:bg-red-900/20 hover:text-red-300 transition-colors border-t border-blue-900/30 mt-1">
-                    <LogOut className="w-4 h-4" /> <span>Logout</span>
+                    <LogOut className="w-4 h-4" /> <span>{t.logout}</span>
                   </button>
                 </div>
               )}
@@ -461,13 +444,13 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
             ))}
 
             <div className="border-b border-blue-900/30">
-              <button onClick={() => { setShowProfileModal(true); setIsMobileMenuOpen(false); }} className="flex w-full items-center gap-3 px-4 py-4 text-base text-slate-400 hover:text-cyan-400 hover:bg-blue-900/10 outline-none"><User className="w-5 h-5" /> Profile</button>
-              <button onClick={() => { setShowPasswordModal(true); setIsMobileMenuOpen(false); }} className="flex w-full items-center gap-3 px-4 py-4 text-base text-slate-400 hover:text-cyan-400 hover:bg-blue-900/10 outline-none"><Lock className="w-5 h-5" /> Change Password</button>
-              <button onClick={handleLogout} className="flex w-full items-center gap-3 px-4 py-4 text-base text-red-400 hover:text-red-300 hover:bg-red-900/10 outline-none"><LogOut className="w-5 h-5" /> Logout</button>
+              <button onClick={() => { setShowProfileModal(true); setIsMobileMenuOpen(false); }} className="flex w-full items-center gap-3 px-4 py-4 text-base text-slate-400 hover:text-cyan-400 hover:bg-blue-900/10 outline-none"><User className="w-5 h-5" /> {t.profile}</button>
+              <button onClick={() => { setShowPasswordModal(true); setIsMobileMenuOpen(false); }} className="flex w-full items-center gap-3 px-4 py-4 text-base text-slate-400 hover:text-cyan-400 hover:bg-blue-900/10 outline-none"><Lock className="w-5 h-5" /> {t.changePassword}</button>
+              <button onClick={handleLogout} className="flex w-full items-center gap-3 px-4 py-4 text-base text-red-400 hover:text-red-300 hover:bg-red-900/10 outline-none"><LogOut className="w-5 h-5" /> {t.logout}</button>
             </div>
 
             <div className="p-4 bg-[#020617]/50">
-              <p className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider">Language</p>
+              <p className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider">{t.language}</p>
               <div className="grid grid-cols-2 gap-2">
                   <button onClick={() => setLanguage("EN")} className={`flex justify-center gap-2 py-3 text-sm font-medium rounded-md border ${language === "EN" ? "bg-[#0B1120] border-cyan-500 text-cyan-400" : "bg-[#0B1120] border-blue-900/30 text-slate-400"}`}>🇬🇧 English</button>
                   <button onClick={() => setLanguage("TH")} className={`flex justify-center gap-2 py-3 text-sm font-medium rounded-md border ${language === "TH" ? "bg-[#0B1120] border-cyan-500 text-cyan-400" : "bg-[#0B1120] border-blue-900/30 text-slate-400"}`}>🇹🇭 ไทย</button>

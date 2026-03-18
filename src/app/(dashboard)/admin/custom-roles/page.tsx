@@ -17,11 +17,16 @@ import {
 import { Navbar } from "@/src/components/layout/navbar"; 
 import { toast } from "sonner";
 import { roleApi } from "@/src/modules/auth/api/role.api"; 
+import { useLanguage } from "@/src/context/LanguageContext";
+import { translations } from "@/src/locales/dicts";
 
 export default function CustomRolesPage() {
   const pathname = usePathname(); 
   const searchParams = useSearchParams();
   const highlightIdParam = searchParams.get("highlight");
+
+  const { language } = useLanguage();
+  const t = translations.customRoles[language];
 
   // States
   const [roles, setRoles] = useState<any[]>([]);
@@ -72,7 +77,7 @@ export default function CustomRolesPage() {
       setTotalCount(count); 
     } catch (error: any) {
       console.error("Fetch Roles Error:", error);
-      toast.error("Failed to load roles");
+      toast.error(t.toast.loadError);
     } finally {
       setIsLoading(false);
     }
@@ -97,14 +102,14 @@ export default function CustomRolesPage() {
         await roleApi.deleteCustomRoleById(orgId, id); 
       }
       
-      toast.success("Successfully deleted role(s).");
+      toast.success(t.toast.deleteSuccess.replace("{count}", selectedIds.length.toString()));
       setSelectedIds([]);
       setShowDeleteConfirm(false);
       
       fetchRolesData(page, searchTerm);
     } catch (error: any) {
       console.error("Delete custom role error:", error);
-      const errorMsg = error?.response?.data?.description || error?.message || "Failed to delete role(s)";
+      const errorMsg = error?.response?.data?.description || error?.message || t.toast.deleteError;
       toast.error(errorMsg);
     }
   };
@@ -137,8 +142,8 @@ export default function CustomRolesPage() {
         <div className="flex-none pt-6 px-4 md:px-6 mb-2">
           <div className="flex items-center gap-4">
               <div>
-                  <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">Custom Roles</h1>
-                  <p className="text-slate-400 text-xs md:text-sm">Manage roles and access permissions for the center.</p>
+                  <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">{t.title}</h1>
+                  <p className="text-slate-400 text-xs md:text-sm">{t.subHeader}</p>
               </div>
           </div>
         </div>
@@ -149,16 +154,16 @@ export default function CustomRolesPage() {
               <div className="flex flex-col sm:flex-row w-full lg:w-auto gap-2">
                   <div className="relative w-full sm:w-auto sm:min-w-[160px]">
                       <select className="w-full appearance-none bg-[#162032] border border-blue-900/50 text-slate-200 text-sm rounded-lg pl-3 pr-8 py-2.5 focus:outline-none focus:border-cyan-500 transition-colors">
-                          <option>All Fields</option>
-                          <option>Role Name</option>
-                          <option>Tags</option>
+                          <option>{t.filters.all}</option>
+                          <option>{t.filters.name}</option>
+                          <option>{t.filters.tags}</option>
                       </select>
                       <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3 top-3 pointer-events-none" />
                   </div>
                   <div className="relative w-full sm:w-auto sm:flex-1 lg:min-w-[240px]">
                       <input 
                         type="text" 
-                        placeholder="Search roles..." 
+                        placeholder={t.searchPlaceholder} 
                         value={searchTerm}                         
                         onChange={(e) => setSearchTerm(e.target.value)} 
                         onKeyDown={(e) => e.key === "Enter" && handleSearchTrigger()}
@@ -178,14 +183,16 @@ export default function CustomRolesPage() {
                     href={selectedRowId ? `/admin/custom-roles/create?prevHighlight=${selectedRowId}` : "/admin/custom-roles/create"} 
                     className="flex-1 lg:flex-none"
                   >
-                      <button className="w-full justify-center px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg uppercase transition-all shadow-lg shadow-cyan-900/20">Add</button>
+                      <button className="w-full justify-center px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg uppercase transition-all shadow-lg shadow-cyan-900/20">
+                        {t.buttons.add}
+                      </button>
                   </Link>
                   <button 
                     onClick={() => setShowDeleteConfirm(true)}
                     disabled={selectedIds.length === 0}
                     className="flex-1 lg:flex-none justify-center px-6 py-2.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/50 text-sm font-semibold rounded-lg uppercase transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                   >
-                      Delete
+                      {t.buttons.delete}
                   </button>
               </div>
           </div>
@@ -199,17 +206,17 @@ export default function CustomRolesPage() {
                       <thead className="bg-[#020617] sticky top-0 z-10 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-blue-900/50">
                           <tr>
                               <th className="p-4 w-[50px] text-center"><input type="checkbox" onChange={handleSelectAll} checked={roles.length > 0 && selectedIds.length === roles.length} className="rounded border-slate-600 bg-slate-800" /></th>
-                              <th className="p-4">Role Name</th>
-                              <th className="p-4">Description</th>
-                              <th className="p-4">Tags</th>
-                              <th className="p-4 text-center">Action</th>
+                              <th className="p-4">{t.columns.roleName}</th>
+                              <th className="p-4">{t.columns.description}</th>
+                              <th className="p-4">{t.columns.tags}</th>
+                              <th className="p-4 text-center">{t.columns.action}</th>
                           </tr>
                       </thead>
                       <tbody className="divide-y divide-blue-900/20">
                           {isLoading ? (
-                              <tr><td colSpan={5} className="p-20 text-center text-slate-500 animate-pulse">Loading roles...</td></tr>
+                              <tr><td colSpan={5} className="p-20 text-center text-slate-500 animate-pulse">{t.loading}</td></tr>
                           ) : roles.length === 0 ? (
-                              <tr><td colSpan={5} className="p-20 text-center text-slate-500 font-medium italic">No custom roles found.</td></tr>
+                              <tr><td colSpan={5} className="p-20 text-center text-slate-500 font-medium italic">{t.noData}</td></tr>
                           ) : (
                               roles.map((role, idx) => {
                                   const roleId = role.id || role.customRoleId || role.roleId;
@@ -225,13 +232,13 @@ export default function CustomRolesPage() {
                                           `}
                                       >
                                           <td className="p-4" onClick={(e) => e.stopPropagation()}>
-                                            <input type="checkbox" checked={selectedIds.includes(roleId)} onChange={() => handleSelectOne(roleId)} className="rounded border-slate-600 bg-slate-800" />
+                                              <input type="checkbox" checked={selectedIds.includes(roleId)} onChange={() => handleSelectOne(roleId)} className="rounded border-slate-600 bg-slate-800" />
                                           </td>
                                           
                                           <td className="p-4 font-medium text-slate-200">
-                                            <Link href={`/admin/custom-roles/${roleId}/update`} className={`hover:underline ${isSelected ? 'text-cyan-400' : 'text-blue-400 hover:text-cyan-300'}`} onClick={(e) => e.stopPropagation()}>
-                                              {role.customRoleName || role.roleName || role.name || "-"}
-                                            </Link>
+                                              <Link href={`/admin/custom-roles/${roleId}/update`} className={`hover:underline ${isSelected ? 'text-cyan-400' : 'text-blue-400 hover:text-cyan-300'}`} onClick={(e) => e.stopPropagation()}>
+                                                  {role.customRoleName || role.roleName || role.name || "-"}
+                                              </Link>
                                           </td>
 
                                           <td className="p-4 text-slate-400 text-sm max-w-[400px] truncate">{role.roleDescription || role.description || "-"}</td>
@@ -260,7 +267,7 @@ export default function CustomRolesPage() {
               {/* Pagination Footer */}
               <div className="flex-none flex items-center justify-between sm:justify-end px-4 py-3 border-t border-blue-900/50 bg-[#020617] z-20 gap-4 sm:gap-6">
                   <div className="flex items-center gap-2 text-sm text-slate-400">
-                      <span>Rows per page</span>
+                      <span>{t.rowsPerPage}</span>
                       <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setPage(1); }} className="bg-transparent border-none text-slate-200 focus:ring-0 cursor-pointer font-medium outline-none">
                           <option value={25} className="bg-[#0B1120]">25</option>
                           <option value={50} className="bg-[#0B1120]">50</option>
@@ -269,7 +276,7 @@ export default function CustomRolesPage() {
                       </select>
                   </div>
                   <div className="flex items-center gap-4">
-                      <div className="text-xs text-slate-400">{totalCount === 0 ? '0-0' : `${startRow}-${endRow}`} of {totalCount}</div>
+                      <div className="text-xs text-slate-400">{totalCount === 0 ? '0-0' : `${startRow}-${endRow}`} {t.of} {totalCount}</div>
                       <div className="flex items-center gap-1">
                           <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1 || isLoading} className="p-1.5 rounded hover:bg-blue-900/40 text-slate-400 disabled:opacity-30 transition-colors"><ChevronLeft className="w-5 h-5" /></button>
                           <button onClick={() => setPage(p => Math.min(Math.ceil(totalCount/itemsPerPage), p + 1))} disabled={page >= Math.ceil(totalCount/itemsPerPage) || totalCount === 0 || isLoading} className="p-1.5 rounded hover:bg-blue-900/40 text-slate-400 disabled:opacity-30 transition-colors"><ChevronRight className="w-5 h-5" /></button>
@@ -285,11 +292,17 @@ export default function CustomRolesPage() {
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
             <div className="bg-[#0B1120] border border-blue-900/50 rounded-xl shadow-2xl w-full max-w-sm p-6 text-center">
                 <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/20 text-red-500"><Trash2 className="w-6 h-6" /></div>
-                <h3 className="text-lg font-bold text-white mb-2 uppercase">Delete Role</h3>
-                <p className="text-sm text-slate-400 mb-6 font-medium leading-relaxed px-2">Are you sure you want to delete {selectedIds.length} role(s)? This action cannot be undone.</p>
+                <h3 className="text-lg font-bold text-white mb-2 uppercase">{t.modal.title}</h3>
+                <p className="text-sm text-slate-400 mb-6 font-medium leading-relaxed px-2">
+                  {t.modal.message.replace("{count}", selectedIds.length.toString())}
+                </p>
                 <div className="flex gap-3">
-                    <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-800 rounded-lg transition-colors border border-slate-700">Cancel</button>
-                    <button onClick={handleBulkDelete} className="flex-1 py-2.5 text-sm font-medium bg-red-600 hover:bg-red-500 text-white rounded-lg transition-all shadow-lg shadow-red-900/20 font-bold uppercase">Delete</button>
+                    <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-800 rounded-lg transition-colors border border-slate-700">
+                      {t.buttons.cancel}
+                    </button>
+                    <button onClick={handleBulkDelete} className="flex-1 py-2.5 text-sm font-medium bg-red-600 hover:bg-red-500 text-white rounded-lg transition-all shadow-lg shadow-red-900/20 font-bold uppercase">
+                      {t.buttons.delete}
+                    </button>
                 </div>
             </div>
         </div>

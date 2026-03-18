@@ -4,6 +4,8 @@ import { X, AlertTriangle, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner"; 
 import { profileApi } from "@/src/modules/auth/api/profile.api"; 
+import { useLanguage } from "@/src/context/LanguageContext";
+import { translations } from "@/src/locales/dicts";
 
 interface UpdateProfileModalProps {
   isOpen: boolean;
@@ -27,6 +29,9 @@ const formatPhoneToE164 = (phone: string) => {
 };
 
 export function UpdateProfileModal({ isOpen, onClose }: UpdateProfileModalProps) {
+  const { language } = useLanguage();
+  const t = translations.profile[language]; 
+
   const [isVisible, setIsVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);     
   const [isFetching, setIsFetching] = useState(false);   
@@ -68,7 +73,7 @@ export function UpdateProfileModal({ isOpen, onClose }: UpdateProfileModalProps)
         setInitialData(loadedData);
       } catch (error: any) {
         console.error("Fetch profile error:", error);
-        toast.error("Failed to load profile data.");
+        toast.error(t.errorFetch); 
       } finally {
         setIsFetching(false);
       }
@@ -83,7 +88,7 @@ export function UpdateProfileModal({ isOpen, onClose }: UpdateProfileModalProps)
       document.body.style.overflow = 'unset';
       setShowConfirmClose(false);
     }
-  }, [isOpen]);
+  }, [isOpen, t.errorFetch]); 
 
   const handleCloseAttempt = () => {
     if (isDirty) {
@@ -109,7 +114,7 @@ export function UpdateProfileModal({ isOpen, onClose }: UpdateProfileModalProps)
 
       await profileApi.updateUserByUserName(orgId, formData.username, payload);
       
-      toast.success("Profile updated successfully!");
+      toast.success(t.success); 
       
       const updatedData = { ...formData, phone: formattedPhone };
       setFormData(updatedData);
@@ -118,7 +123,7 @@ export function UpdateProfileModal({ isOpen, onClose }: UpdateProfileModalProps)
       onClose();
     } catch (error: any) {
       console.error("Update profile error:", error);
-      toast.error(error?.response?.data?.message || "Failed to update profile.");
+      toast.error(error?.response?.data?.message || t.errorFetch);
     } finally {
       setIsLoading(false);
     }
@@ -150,8 +155,8 @@ export function UpdateProfileModal({ isOpen, onClose }: UpdateProfileModalProps)
         {/* Header */}
         <div className="flex items-center justify-between px-8 py-6 border-b border-blue-900/30 bg-[#0F1629]/50 relative z-10">
           <div>
-            <h2 className="text-2xl font-bold text-white tracking-wide uppercase">Update Profile</h2>
-            <p className="text-sm text-slate-400 mt-1">Manage your account information and preferences.</p>
+            <h2 className="text-2xl font-bold text-white tracking-wide uppercase">{t.title}</h2>
+            <p className="text-sm text-slate-400 mt-1">{t.subHeader}</p>
           </div>
           <button
             onClick={handleCloseAttempt}
@@ -166,19 +171,19 @@ export function UpdateProfileModal({ isOpen, onClose }: UpdateProfileModalProps)
           {isFetching ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0B1120]/80 z-20">
               <Loader2 className="w-8 h-8 animate-spin text-blue-500 mb-4" />
-              <p className="text-slate-400 text-sm">Loading profile data...</p>
+              <p className="text-slate-400 text-sm">{t.loading}</p>
             </div>
           ) : (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <InputField
-                  label="Username"
+                  label={t.labels.username}
                   value={formData.username}
                   disabled
                   readOnly
                 />
                 <InputField
-                  label="Email Address"
+                  label={t.labels.email}
                   value={formData.email}
                   disabled
                   readOnly
@@ -189,15 +194,15 @@ export function UpdateProfileModal({ isOpen, onClose }: UpdateProfileModalProps)
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <InputField
-                  label="First Name"
-                  placeholder="Enter first name"
+                  label={t.labels.firstName}
+                  placeholder={t.placeholders.firstName}
                   value={formData.firstName}
                   onChange={(e: any) => setFormData({...formData, firstName: e.target.value})}
                   required
                 />
                 <InputField
-                  label="Last Name"
-                  placeholder="Enter last name"
+                  label={t.labels.lastName}
+                  placeholder={t.placeholders.lastName}
                   value={formData.lastName}
                   onChange={(e: any) => setFormData({...formData, lastName: e.target.value})}
                   required
@@ -206,15 +211,15 @@ export function UpdateProfileModal({ isOpen, onClose }: UpdateProfileModalProps)
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <InputField
-                  label="Phone Number"
-                  placeholder="e.g. 0812345678"
+                  label={t.labels.phone}
+                  placeholder={t.placeholders.phone}
                   value={formData.phone}
                   onChange={(e: any) => setFormData({...formData, phone: e.target.value})}
                   required
                 />
                 <InputField
-                  label="Secondary Email"
-                  placeholder="Optional secondary email"
+                  label={t.labels.secondaryEmail}
+                  placeholder={t.placeholders.secondaryEmail}
                   value={formData.secondaryEmail}
                   onChange={(e: any) => setFormData({...formData, secondaryEmail: e.target.value})}
                 />
@@ -230,7 +235,7 @@ export function UpdateProfileModal({ isOpen, onClose }: UpdateProfileModalProps)
             className="px-6 py-2.5 text-sm font-medium text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-all uppercase"
             disabled={isLoading || isFetching}
           >
-            Cancel
+            {t.buttons.cancel}
           </button>
 
           <button 
@@ -241,7 +246,7 @@ export function UpdateProfileModal({ isOpen, onClose }: UpdateProfileModalProps)
             }`}
           >
             {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            {isLoading ? "Saving" : "Save"}
+            {isLoading ? t.saving : t.buttons.save}
           </button>
         </div>
 
@@ -253,16 +258,16 @@ export function UpdateProfileModal({ isOpen, onClose }: UpdateProfileModalProps)
               <div className="w-14 h-14 rounded-full bg-red-500/10 flex items-center justify-center border border-red-500/20 mx-auto mb-4">
                 <AlertTriangle className="w-8 h-8 text-red-500" />
               </div>
-              <h3 className="text-xl font-bold text-white">Discard Changes?</h3>
+              <h3 className="text-xl font-bold text-white">{t.confirmTitle}</h3>
               <p className="text-sm text-slate-400 mt-2 mb-6">
-                You have unsaved changes. Are you sure you want to leave?
+                {t.confirmMsg}
               </p>
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setShowConfirmClose(false)}
                   className="flex-1 px-4 py-2.5 text-sm font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
                 >
-                  Keep Editing
+                  {t.confirmCancel}
                 </button>
                 <button
                   onClick={() => {
@@ -271,7 +276,7 @@ export function UpdateProfileModal({ isOpen, onClose }: UpdateProfileModalProps)
                   }}
                   className="flex-1 px-4 py-2.5 text-sm font-bold text-white bg-red-600 hover:bg-red-500 rounded-lg shadow-lg shadow-red-900/20 transition-colors"
                 >
-                  Discard
+                  {t.confirmLeave}
                 </button>
               </div>
             </div>

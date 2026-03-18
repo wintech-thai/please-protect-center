@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Clock, ChevronDown, Check } from "lucide-react";
 import {
   Popover,
@@ -14,6 +14,8 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
+import { useLanguage } from "@/src/context/LanguageContext";
+import { translations } from "@/src/locales/dicts";
 
 // Ensure dark mode for MUI components to match the app
 const darkTheme = createTheme({
@@ -67,37 +69,30 @@ interface AdvancedTimeRangeSelectorProps {
   className?: string;
 }
 
-const DEFAULT_LABELS = {
-  absoluteTitle: "Absolute Time Range",
-  from: "From",
-  to: "To",
-  apply: "Apply Range",
-  searchPlaceholder: "Search quick ranges...",
-  customRange: "Custom Range",
-};
-
-const QUICK_RANGE_KEYS = [
-  { value: "5m", label: "Last 5 minutes" },
-  { value: "15m", label: "Last 15 minutes" },
-  { value: "30m", label: "Last 30 minutes" },
-  { value: "1h", label: "Last 1 hour" },
-  { value: "3h", label: "Last 3 hours" },
-  { value: "4h", label: "Last 4 hours" },
-  { value: "6h", label: "Last 6 hours" },
-  { value: "12h", label: "Last 12 hours" },
-  { value: "24h", label: "Last 24 hours" },
-  { value: "2d", label: "Last 2 days" },
-  { value: "7d", label: "Last 7 days" },
-  { value: "30d", label: "Last 30 days" },
-];
-
 export function AdvancedTimeRangeSelector({
   value,
   onChange,
   disabled,
   className,
 }: AdvancedTimeRangeSelectorProps) {
-  
+  const { language } = useLanguage();
+  const t = translations.timePicker[language];
+
+  const quickRangeKeys = useMemo(() => [
+    { value: "5m", label: t.last5m },
+    { value: "15m", label: t.last15m },
+    { value: "30m", label: t.last30m },
+    { value: "1h", label: t.last1h },
+    { value: "3h", label: t.last3h },
+    { value: "4h", label: t.last4h },
+    { value: "6h", label: t.last6h },
+    { value: "12h", label: t.last12h },
+    { value: "24h", label: t.last24h },
+    { value: "2d", label: t.last2d },
+    { value: "7d", label: t.last7d },
+    { value: "30d", label: t.last30d },
+  ], [t]);
+
   const [isOpen, setIsOpen] = useState(false);
   const [fromDate, setFromDate] = useState<Dayjs | null>(null);
   const [toDate, setToDate] = useState<Dayjs | null>(null);
@@ -110,7 +105,6 @@ export function AdvancedTimeRangeSelector({
         setFromDate(dayjs(value.start * 1000));
         setToDate(dayjs(value.end * 1000));
       } else if (value.type === "relative") {
-        // Set default absolute range relative to now for better UX
         const range = value.value;
         const now = dayjs();
         let start = now;
@@ -126,8 +120,7 @@ export function AdvancedTimeRangeSelector({
         setToDate(now);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [isOpen, value.type, value.value, value.start, value.end]);
 
   const handleApplyAbsolute = () => {
     if (fromDate && toDate) {
@@ -142,7 +135,7 @@ export function AdvancedTimeRangeSelector({
     }
   };
 
-  const handleSelectRelative = (range: (typeof QUICK_RANGE_KEYS)[0]) => {
+  const handleSelectRelative = (range: typeof quickRangeKeys[0]) => {
     onChange({
       type: "relative",
       value: range.value,
@@ -167,8 +160,8 @@ export function AdvancedTimeRangeSelector({
             <Clock className="shrink-0 h-4 w-4 text-slate-400" />
             <span className="truncate text-sm">
               {value.type === "relative"
-                ? QUICK_RANGE_KEYS.find((r) => r.value === value.value)?.label ?? "Last 5 minutes"
-                : value.label || DEFAULT_LABELS.customRange}
+                ? quickRangeKeys.find((r) => r.value === value.value)?.label ?? t.last5m
+                : value.label || t.customRange}
             </span>
           </div>
           <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
@@ -190,7 +183,7 @@ export function AdvancedTimeRangeSelector({
                 : "text-slate-500 hover:text-slate-300",
             )}
           >
-            Quick Ranges
+            {language === "TH" ? "ช่วงเวลาด่วน" : "Quick Ranges"}
           </button>
           <button
             onClick={() => setActiveTab("absolute")}
@@ -201,7 +194,7 @@ export function AdvancedTimeRangeSelector({
                 : "text-slate-500 hover:text-slate-300",
             )}
           >
-            {DEFAULT_LABELS.absoluteTitle}
+            {t.absoluteTitle}
           </button>
         </div>
 
@@ -214,14 +207,14 @@ export function AdvancedTimeRangeSelector({
             )}
           >
             <h4 className="hidden sm:block font-semibold text-sm text-slate-100 mb-2">
-              {DEFAULT_LABELS.absoluteTitle}
+              {t.absoluteTitle}
             </h4>
 
             <ThemeProvider theme={darkTheme}>
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-xs text-slate-400">{DEFAULT_LABELS.from}</label>
+                    <label className="text-xs text-slate-400">{t.from}</label>
                     <DateTimePicker
                       value={fromDate}
                       onChange={(newValue) => setFromDate(newValue)}
@@ -231,7 +224,7 @@ export function AdvancedTimeRangeSelector({
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-xs text-slate-400">{DEFAULT_LABELS.to}</label>
+                    <label className="text-xs text-slate-400">{t.to}</label>
                     <DateTimePicker
                       value={toDate}
                       onChange={(newValue) => setToDate(newValue)}
@@ -250,7 +243,7 @@ export function AdvancedTimeRangeSelector({
                 onClick={handleApplyAbsolute}
                 disabled={!fromDate || !toDate}
               >
-                {DEFAULT_LABELS.apply}
+                {t.apply}
               </Button>
             </div>
           </div>
@@ -265,12 +258,12 @@ export function AdvancedTimeRangeSelector({
             <div className="p-3 border-b border-slate-800">
               <input
                 type="text"
-                placeholder={DEFAULT_LABELS.searchPlaceholder}
+                placeholder={t.searchPlaceholder}
                 className="w-full bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-300 focus:outline-none focus:border-violet-500 transition-colors"
               />
             </div>
             <div className="flex-1 overflow-y-auto custom-scrollbar p-1">
-              {QUICK_RANGE_KEYS.map((range) => (
+              {quickRangeKeys.map((range) => (
                 <button
                   key={range.value}
                   onClick={() => handleSelectRelative(range)}

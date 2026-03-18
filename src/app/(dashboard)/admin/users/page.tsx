@@ -24,11 +24,16 @@ import { Navbar } from "@/src/components/layout/navbar";
 import { toast } from "sonner"; 
 import { userApi } from "@/src/modules/auth/api/user.api";
 import { UserItem } from "@/src/modules/auth/api/types";
+import { useLanguage } from "@/src/context/LanguageContext";
+import { translations } from "@/src/locales/dicts";
 
 export default function UsersPage() {
   const pathname = usePathname(); 
   const searchParams = useSearchParams();
   const highlightIdParam = searchParams.get("highlight");
+
+  const { language } = useLanguage();
+  const t = translations.users[language];
 
   // States
   const [users, setUsers] = useState<UserItem[]>([]);
@@ -74,7 +79,7 @@ export default function UsersPage() {
       setTotalCount(count); 
     } catch (error: any) {
       console.error("Fetch Users Error:", error);
-      toast.error("Failed to load users");
+      toast.error(t.toast.fetchError); 
     } finally {
       setIsLoading(false);
     }
@@ -108,14 +113,14 @@ export default function UsersPage() {
         await userApi.deleteUser(orgId, id); 
       }
       
-      toast.success("Successfully deleted user(s).");
+      toast.success(t.toast.deleteSuccess.replace("{count}", selectedIds.length.toString()));
       setSelectedIds([]);
       setShowDeleteConfirm(false);
       fetchUsersData(page, searchTerm);
 
     } catch (error: any) {
       console.error("Delete users error:", error);
-      const errorMsg = error?.response?.data?.description || error?.message || "Failed to delete users.";
+      const errorMsg = error?.response?.data?.description || error?.message || t.toast.deleteError;
       toast.error(errorMsg);
     }
   };
@@ -127,35 +132,36 @@ export default function UsersPage() {
     const userId = targetUser.orgUserId;
     const isCurrentlyDisabled = targetUser.userStatus === "Disabled";
 
-    const toastId = toast.loading(isCurrentlyDisabled ? "Enabling user..." : "Disabling user...");
+    const toastId = toast.loading(t.loading);
 
     try {
       if (isCurrentlyDisabled) {
         await userApi.enableUserById(orgId, userId);
-        toast.success("User enabled successfully", { id: toastId });
       } else {
         await userApi.disableUserById(orgId, userId);
-        toast.success("User disabled successfully", { id: toastId });
       }
+      
+      toast.success(t.toast.statusSuccess, { id: toastId });
       
       setShowStatusConfirm(false);
       setTargetUser(null);
       fetchUsersData(page, searchTerm); 
     } catch (error: any) {
       console.error("Toggle status error:", error);
-      const errorMsg = error?.response?.data?.description || "Failed to update user status";
+      const errorMsg = error?.response?.data?.description || t.toast.statusError;
       toast.error(errorMsg, { id: toastId });
     }
   };
 
   const handleResetPasswordLink = (user: UserItem) => {
+    setTargetUser(user); 
     setGeneratedLink(`https://please-protect.center/reset?token=mock_${Math.random().toString(36).substr(2, 9)}`);
     setShowResetLinkModal(true);
   };
 
   const copyToClipboard = async () => {
     await navigator.clipboard.writeText(generatedLink);
-    toast.success("Link copied to clipboard!");
+    toast.success(t.toast.copySuccess); 
   };
 
   const handleActionClick = (user: UserItem) => {
@@ -183,8 +189,8 @@ export default function UsersPage() {
       <main className="flex-1 flex flex-col relative overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
         
         <div className="flex-none pt-6 px-4 md:px-6 mb-2">
-            <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">User Management</h1>
-            <p className="text-slate-400 text-xs md:text-sm">Manage users, roles, and access permissions for the center.</p>
+            <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">{t.title}</h1> 
+            <p className="text-slate-400 text-xs md:text-sm">{t.subHeader}</p> 
         </div>
 
         <div className="flex-none py-4">
@@ -192,14 +198,16 @@ export default function UsersPage() {
               <div className="flex flex-col sm:flex-row w-full lg:w-auto gap-2">
                   <div className="relative">
                       <select className="appearance-none bg-[#162032] border border-blue-900/50 text-slate-300 text-sm rounded-lg pl-3 pr-8 py-2.5 focus:outline-none transition-colors">
-                          <option>All Fields</option>
+                          <option>{t.filters.all}</option> 
+                          <option>{t.filters.username}</option>
+                          <option>{t.filters.email}</option>
                       </select>
                       <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3 top-3.5 pointer-events-none" />
                   </div>
                   <div className="relative flex-1 lg:min-w-[240px]">
                       <input 
                         type="text" 
-                        placeholder="Search users..." 
+                        placeholder={t.searchPlaceholder} 
                         value={searchTerm}                         
                         onChange={(e) => setSearchTerm(e.target.value)} 
                         onKeyDown={(e) => e.key === "Enter" && fetchUsersData(1, searchTerm)}
@@ -213,10 +221,12 @@ export default function UsersPage() {
 
               <div className="flex gap-2 w-full lg:w-auto justify-end">
                   <Link href="/admin/users/create">
-                      <button className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg uppercase shadow-lg">Add</button>
+                      <button className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg uppercase shadow-lg">
+                        {t.buttons.add} 
+                      </button>
                   </Link>
                   <button onClick={() => setShowDeleteConfirm(true)} disabled={selectedIds.length === 0} className="px-6 py-2.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/50 text-sm font-semibold rounded-lg uppercase disabled:opacity-30">
-                      Delete
+                      {t.buttons.delete} 
                   </button>
               </div>
           </div>
@@ -230,19 +240,21 @@ export default function UsersPage() {
                       <thead className="bg-[#020617] sticky top-0 z-10 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-blue-900/50">
                           <tr>
                               <th className="p-4 w-[50px]"><input type="checkbox" onChange={handleSelectAll} checked={users.length > 0 && selectedIds.length === users.length} className="rounded border-slate-600 bg-slate-800" /></th>
-                              <th className="p-4">Username</th>
-                              <th className="p-4">Email</th>
-                              <th className="p-4">Tags</th>
-                              <th className="p-4">Custom Role</th>
-                              <th className="p-4">Role</th>
-                              <th className="p-4 text-center">Initial User</th>
-                              <th className="p-4">Status</th>
-                              <th className="p-4 text-center">Action</th>
+                              <th className="p-4">{t.columns.username}</th>
+                              <th className="p-4">{t.columns.email}</th>
+                              <th className="p-4">{t.columns.tags}</th>
+                              <th className="p-4">{t.columns.customRole}</th>
+                              <th className="p-4">{t.columns.role}</th>
+                              <th className="p-4 text-center">{t.columns.initialUser}</th>
+                              <th className="p-4">{t.columns.status}</th>
+                              <th className="p-4 text-center">{t.columns.action}</th>
                           </tr>
                       </thead>
                       <tbody className="divide-y divide-blue-900/20">
                           {isLoading ? (
-                              <tr><td colSpan={9} className="p-20 text-center text-slate-500 animate-pulse">Loading users...</td></tr>
+                              <tr><td colSpan={9} className="p-20 text-center text-slate-500 animate-pulse">{t.loading}</td></tr>
+                          ) : users.length === 0 ? (
+                              <tr><td colSpan={9} className="p-20 text-center text-slate-500 italic">{t.noData}</td></tr>
                           ) : (
                               users.map((user, idx) => {
                                   const userId = user.orgUserId; 
@@ -283,7 +295,7 @@ export default function UsersPage() {
                                                     onClick={() => handleActionClick(user)}
                                                     className="cursor-pointer focus:bg-white/5 focus:text-[#f87171] text-[#f87171] px-3 py-2 text-sm rounded-md outline-none"
                                                   >
-                                                    Disable User
+                                                    {t.buttons.disable} 
                                                   </DropdownMenuItem>
 
                                                   <DropdownMenuItem 
@@ -291,7 +303,7 @@ export default function UsersPage() {
                                                     onClick={() => handleActionClick(user)}
                                                     className="cursor-pointer focus:bg-white/5 focus:text-slate-300 text-slate-300 px-3 py-2 text-sm rounded-md outline-none"
                                                   >
-                                                    Enable User
+                                                    {t.buttons.enable}
                                                   </DropdownMenuItem>
                                                   
                                                   <DropdownMenuItem 
@@ -299,7 +311,7 @@ export default function UsersPage() {
                                                     onClick={() => handleResetPasswordLink(user)}
                                                     className="cursor-pointer focus:bg-white/5 focus:text-[#2dd4bf] text-[#2dd4bf] px-3 py-2 text-sm rounded-md outline-none"
                                                   >
-                                                    Reset Password Link
+                                                    {t.buttons.resetPassword}
                                                   </DropdownMenuItem>
 
                                                 </DropdownMenuContent>
@@ -315,14 +327,16 @@ export default function UsersPage() {
               
               <div className="flex-none flex items-center justify-between sm:justify-end px-6 py-4 border-t border-blue-900/50 bg-[#020617] z-20 gap-6">
                   <div className="flex items-center gap-2 text-sm text-slate-400">
-                      <span>Rows per page</span>
+                      <span>{t.rowsPerPage}</span> 
                       <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setPage(1); }} className="bg-transparent border-none text-slate-200 focus:ring-0 cursor-pointer font-medium outline-none">
                           <option value={25} className="bg-slate-900">25</option>
                           <option value={50} className="bg-slate-900">50</option>
+                          <option value={100} className="bg-slate-900">100</option>
+                          <option value={200} className="bg-slate-900">200</option>
                       </select>
                   </div>
                   <div className="flex items-center gap-4 text-xs text-slate-400 font-bold">
-                      <div>{startRow}-{endRow} of {totalCount}</div>
+                      <div>{startRow}-{endRow} {t.of} {totalCount}</div> 
                       <div className="flex items-center gap-1">
                           <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded hover:bg-blue-900/40 disabled:opacity-30 transition-colors"><ChevronLeft className="w-5 h-5" /></button>
                           <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || totalPages === 0} className="p-1.5 rounded hover:bg-blue-900/40 disabled:opacity-30 transition-colors"><ChevronRight className="w-5 h-5" /></button>
@@ -338,14 +352,18 @@ export default function UsersPage() {
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
             <div className="bg-[#0B1120] border border-blue-900/50 rounded-xl shadow-2xl w-full max-w-sm p-6 text-center animate-in zoom-in-95">
                 <h3 className="text-lg font-bold text-white mb-2">
-                    {targetUser?.userStatus === "Disabled" ? "Enable User" : "Disable User"}
+                    {targetUser?.userStatus === "Disabled" ? t.modal.enableTitle : t.modal.disableTitle} {/* 🚀 ใช้คำแปล */}
                 </h3>
                 <p className="text-sm text-slate-400 mb-6">
-                    Are you sure you want to {targetUser?.userStatus === "Disabled" ? "enable" : "disable"} this user?
+                    {t.modal.statusMessage.replace("{action}", targetUser?.userStatus === "Disabled" ? "enable" : "disable")}
                 </p>
                 <div className="flex gap-3">
-                    <button onClick={() => { setShowStatusConfirm(false); setTargetUser(null); }} className="flex-1 px-4 py-2 text-sm font-medium text-slate-300 bg-slate-800 rounded-lg border border-slate-700 transition-colors">Cancel</button>
-                    <button onClick={handleToggleStatus} className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg shadow-lg hover:bg-blue-500 transition-all">Confirm</button>
+                    <button onClick={() => { setShowStatusConfirm(false); setTargetUser(null); }} className="flex-1 px-4 py-2 text-sm font-medium text-slate-300 bg-slate-800 rounded-lg border border-slate-700 transition-colors">
+                      {t.buttons.cancel}
+                    </button>
+                    <button onClick={handleToggleStatus} className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg shadow-lg hover:bg-blue-500 transition-all">
+                      {t.buttons.ok}
+                    </button>
                 </div>
             </div>
         </div>
@@ -355,11 +373,17 @@ export default function UsersPage() {
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
             <div className="bg-[#0B1120] border border-blue-900/50 rounded-xl shadow-2xl w-full max-w-sm p-6 text-center animate-in zoom-in-95">
                 <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center mb-4 border border-red-500/20 mx-auto"><Trash2 className="w-6 h-6 text-red-500" /></div>
-                <h3 className="text-lg font-bold text-white mb-2">Delete Users</h3>
-                <p className="text-sm text-slate-400 mb-6">Are you sure you want to delete {selectedIds.length} selected user(s)?</p>
+                <h3 className="text-lg font-bold text-white mb-2">{t.modal.deleteTitle}</h3>
+                <p className="text-sm text-slate-400 mb-6">
+                  {t.modal.deleteMessage.replace("{count}", selectedIds.length.toString())}
+                </p>
                 <div className="flex gap-3">
-                    <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 px-4 py-2 text-sm font-medium text-slate-300 bg-slate-800 rounded-lg border border-slate-700">Cancel</button>
-                    <button onClick={handleBulkDelete} className="flex-1 px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg shadow-lg hover:bg-red-500 transition-all">Delete</button>
+                    <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 px-4 py-2 text-sm font-medium text-slate-300 bg-slate-800 rounded-lg border border-slate-700">
+                      {t.buttons.cancel}
+                    </button>
+                    <button onClick={handleBulkDelete} className="flex-1 px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg shadow-lg hover:bg-red-500 transition-all">
+                      {t.buttons.delete}
+                    </button>
                 </div>
             </div>
         </div>
@@ -369,14 +393,19 @@ export default function UsersPage() {
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
             <div className="bg-[#0B1120] border border-blue-900/50 rounded-xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95">
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-bold text-white uppercase tracking-wider">Reset Password</h3>
+                    <h3 className="text-lg font-bold text-white uppercase tracking-wider">{t.modal.resetPasswordTitle}</h3>
                     <button onClick={() => setShowResetLinkModal(false)}><X className="w-5 h-5 text-slate-500 hover:text-white transition-colors" /></button>
                 </div>
+                <p className="text-sm text-slate-400 mb-4">
+                    {t.modal.resetPasswordMessage.replace("{name}", targetUser?.userName || "the user")}
+                </p>
                 <div className="relative mb-6">
                     <input type="text" readOnly value={generatedLink} className="w-full bg-[#020617] border border-blue-900/50 text-cyan-400 text-xs rounded-md pl-3 pr-10 py-3 outline-none focus:border-cyan-500 transition-colors" />
                     <button onClick={copyToClipboard} className="absolute right-2 top-2.5 p-1 text-slate-500 hover:text-cyan-400 transition-colors"><Copy className="w-4 h-4" /></button>
                 </div>
-                <button onClick={() => setShowResetLinkModal(false)} className="w-full py-2.5 bg-blue-600 text-white font-bold rounded-md uppercase text-sm hover:bg-blue-500 transition-all shadow-lg">Done</button>
+                <button onClick={() => setShowResetLinkModal(false)} className="w-full py-2.5 bg-blue-600 text-white font-bold rounded-md uppercase text-sm hover:bg-blue-500 transition-all shadow-lg">
+                  {t.buttons.done}
+                </button>
             </div>
         </div>
       )}

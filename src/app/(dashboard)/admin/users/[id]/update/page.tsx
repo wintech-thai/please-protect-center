@@ -13,9 +13,10 @@ import {
 } from "lucide-react";
 import { Navbar } from "@/src/components/layout/navbar";
 import { toast } from "sonner"; 
-
 import { roleApi } from "@/src/modules/auth/api/role.api";
 import { userApi } from "@/src/modules/auth/api/user.api";
+import { useLanguage } from "@/src/context/LanguageContext";
+import { translations } from "@/src/locales/dicts";
 
 interface RoleItem {
   id: string;
@@ -27,6 +28,9 @@ export default function UpdateUserPage() {
   const router = useRouter();
   const params = useParams();
   const userId = params?.id as string;
+
+  const { language } = useLanguage();
+  const t = translations.updateUser[language];
 
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -78,6 +82,13 @@ export default function UpdateUserPage() {
         })));
 
         const userData = userRes?.orgUser || {};
+        
+        if (!userData || Object.keys(userData).length === 0) {
+            toast.error(t.toast.dataNotFound);
+            router.push("/admin/users");
+            return;
+        }
+
         const userTags = userData.tags ? userData.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [];
         const userRolesList = userData.rolesList ? userData.rolesList.split(',').map((r: string) => r.trim()).filter(Boolean) : [];
         const currentEmail = userData.userEmail || userData.tmpUserEmail || "";
@@ -103,14 +114,14 @@ export default function UpdateUserPage() {
 
       } catch (error: any) {
         console.error("Failed to load user data:", error);
-        toast.error("Failed to load user data from server");
+        toast.error(t.toast.loadError);
       } finally {
         setIsLoadingData(false);
       }
     };
 
     initData();
-  }, [userId]);
+  }, [userId, t.toast.loadError, t.toast.dataNotFound, router]); 
 
   // --- Helper: Check Dirty State ---
   const checkIsDirty = () => {
@@ -202,12 +213,12 @@ export default function UpdateUserPage() {
 
       await userApi.updateUserById(orgId, userId, payload);
       
-      toast.success("User updated successfully!");
+      toast.success(t.toast.updateSuccess); 
       router.push(`/admin/users?highlight=${userId}`);
       
     } catch (error: any) {
       console.error("Update User Error:", error);
-      toast.error(error?.response?.data?.message || "Failed to update user.");
+      toast.error(error?.response?.data?.message || t.toast.updateError); 
     } finally {
       setIsSubmitting(false);
     }
@@ -220,7 +231,7 @@ export default function UpdateUserPage() {
         <div className="flex-1 flex items-center justify-center text-slate-400">
           <div className="flex flex-col items-center gap-3">
             <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-            <span>Loading...</span>
+            <span>{t.loading}</span> 
           </div>
         </div>
       </div>
@@ -242,12 +253,12 @@ export default function UpdateUserPage() {
             </button>
             <div>
                 <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-                    Update User
+                    {t.title} 
                     <span className="text-xs font-normal text-slate-500 px-2 py-0.5 rounded-full border border-slate-800 bg-slate-900 font-mono">
                       {formData.username}
                     </span>
                 </h1>
-                <p className="text-slate-400 text-sm mt-0.5">Modify user roles and permissions</p>
+                <p className="text-slate-400 text-sm mt-0.5">{t.subHeader}</p> 
             </div>
         </div>
       </div>
@@ -259,12 +270,12 @@ export default function UpdateUserPage() {
             <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 shadow-sm">
                 <h2 className="text-base font-semibold text-white mb-6 flex items-center gap-2 border-b border-slate-800 pb-3">
                     <span className="w-1 h-5 bg-blue-500 rounded-full"></span>
-                    User Information
+                    {t.infoTitle} 
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-slate-400">
-                            Username <span className="text-red-400">*</span>
+                            {t.labels.username} <span className="text-red-400">*</span> 
                         </label>
                         <input 
                             type="text" 
@@ -276,7 +287,7 @@ export default function UpdateUserPage() {
 
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-slate-400">
-                            Email <span className="text-red-400">*</span>
+                            {t.labels.email} <span className="text-red-400">*</span> 
                         </label>
                         <input 
                             type="text" 
@@ -288,7 +299,7 @@ export default function UpdateUserPage() {
                 </div>
                 
                 <div className="space-y-2 mt-6">
-                    <label className="text-sm font-medium text-slate-300">Tags</label>
+                    <label className="text-sm font-medium text-slate-300">{t.labels.tags}</label> {/* 🚀 ใช้คำแปล */}
                     <div className={`w-full bg-slate-950 border border-slate-700 focus-within:border-blue-500 rounded-lg px-3 py-2 min-h-[46px] flex flex-wrap gap-2 items-center transition-all`}>
                         {formData.tags.map(tag => (
                             <span key={tag} className="bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium px-2.5 py-1 rounded-full flex items-center gap-1.5 animate-in fade-in zoom-in duration-200">
@@ -298,7 +309,7 @@ export default function UpdateUserPage() {
                         ))}
                         <input 
                             type="text" value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={handleTagKeyDown}
-                            placeholder={formData.tags.length === 0 ? "Type and press Enter to add tags" : ""}
+                            placeholder={formData.tags.length === 0 ? t.labels.tagsPlaceholder : ""} 
                             className="bg-transparent outline-none text-slate-200 flex-1 min-w-[150px] text-sm placeholder:text-slate-600 h-full py-1"
                         />
                     </div>
@@ -308,18 +319,18 @@ export default function UpdateUserPage() {
             <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 shadow-sm">
                 <h2 className="text-base font-semibold text-white mb-6 flex items-center gap-2 border-b border-slate-800 pb-3">
                     <span className="w-1 h-5 bg-purple-500 rounded-full"></span>
-                    Roles & Permissions
+                    {t.rolesTitle} 
                 </h2>
                 
                 <div className="mb-6 max-w-xl">
-                    <label className="text-sm font-medium text-slate-300 mb-2 block">Custom Role Template (Optional)</label>
+                    <label className="text-sm font-medium text-slate-300 mb-2 block">{t.labels.customRole}</label> {/* 🚀 ใช้คำแปล */}
                     <div className="relative">
                         <select 
                             value={formData.customRole}
                             onChange={e => setFormData({...formData, customRole: e.target.value})}
                             className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 appearance-none outline-none focus:border-blue-500 transition-all cursor-pointer text-sm"
                         >
-                            <option value="">Select a custom role...</option>
+                            <option value="">{t.labels.selectRole}</option> 
                             {customRolesList.map((role, index) => (
                                 <option key={role.id || `custom-role-${index}`} value={role.id}>{role.name}</option>
                             ))}
@@ -331,16 +342,16 @@ export default function UpdateUserPage() {
                 </div>
 
                 <div>
-                    <h3 className="text-sm font-medium text-slate-300 mb-3">System Roles Assignment</h3>
+                    <h3 className="text-sm font-medium text-slate-300 mb-3">{t.labels.systemRoles}</h3> {/* 🚀 ใช้คำแปล */}
                     <div className="flex flex-col md:flex-row gap-4 items-center">
                         <div className="flex-1 w-full bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex flex-col h-[320px]">
                             <div className="px-4 py-3 bg-slate-900/80 border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider flex justify-between items-center">
-                                <span>Available Roles</span>
+                                <span>{t.labels.availableRoles}</span> {/* 🚀 ใช้คำแปล */}
                                 <span className="bg-slate-800 px-2 py-0.5 rounded text-[10px] text-slate-500">{leftRoles.length}</span>
                             </div>
                             <div className="p-2 overflow-y-auto flex-1 custom-scrollbar space-y-1">
                                 {leftRoles.length === 0 ? (
-                                    <div className="h-full flex items-center justify-center text-slate-600 text-xs opacity-70">No roles available</div>
+                                    <div className="p-4 text-center text-sm text-slate-500 italic">{t.noRolesAvailable}</div>
                                 ) : (
                                     leftRoles.map((role, index) => (
                                         <div 
@@ -372,15 +383,12 @@ export default function UpdateUserPage() {
 
                         <div className="flex-1 w-full bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex flex-col h-[320px]">
                             <div className="px-4 py-3 bg-slate-900/80 border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider flex justify-between items-center">
-                                <span>Selected Roles</span>
+                                <span>{t.labels.selectedRoles}</span> {/* 🚀 ใช้คำแปล */}
                                 <span className="bg-slate-800 px-2 py-0.5 rounded text-[10px] text-slate-500">{rightRoles.length}</span>
                             </div>
                             <div className="p-2 overflow-y-auto flex-1 custom-scrollbar space-y-1">
                                 {rightRoles.length === 0 ? (
-                                    <div className="h-full flex flex-col items-center justify-center text-slate-600 opacity-50 space-y-2">
-                                        <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center border border-slate-800"><ChevronRight className="w-5 h-5 text-slate-700" /></div>
-                                        <span className="text-[13px] font-medium">No roles selected</span>
-                                    </div>
+                                    <div className="p-4 text-center text-sm text-slate-500 italic">{t.noRolesSelected}</div>
                                 ) : (
                                     rightRoles.map((role, index) => (
                                         <div 
@@ -408,33 +416,31 @@ export default function UpdateUserPage() {
       </div>
 
       <div className="flex-none p-4 md:px-8 border-t border-slate-800 bg-slate-950 flex justify-end gap-3 z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-            <button onClick={handleCancel} className="px-6 py-2.5 rounded-lg border border-red-500/50 text-red-500 hover:bg-red-500/10 transition-all font-medium text-sm">
-                Cancel
+            <button onClick={handleCancel} className="px-6 py-2.5 rounded-lg border border-red-500/50 text-red-500 hover:bg-red-500/10 transition-all font-medium text-sm uppercase">
+                {t.buttons.cancel} 
             </button>
             <button 
                 onClick={handleSubmit} 
                 disabled={isSubmitting} 
-                className="px-8 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 transition-all font-medium text-sm flex items-center justify-center gap-2 min-w-[100px]"
+                className="px-8 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white shadow-lg transition-all font-medium text-sm flex items-center justify-center gap-2 min-w-[100px] uppercase"
             >
-                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : t.buttons.save} 
             </button>
       </div>
 
       {/* Exit Dialog */}
       {showExitDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-sm p-6 text-center transform scale-100 animate-in zoom-in-95 duration-200">
-                <div className="w-14 h-14 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4 border border-red-500/20">
-                  <AlertTriangle className="w-8 h-8 text-red-500" />
-                </div>
-                <h3 className="text-lg font-bold text-white mb-2">Discard Changes?</h3>
-                <p className="text-sm text-slate-400 mb-6">You have unsaved changes. Are you sure you want to leave?</p>
-                <div className="flex justify-end gap-3">
-                    <button onClick={() => setShowExitDialog(false)} className="flex-1 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 rounded-lg transition-colors border border-slate-700">
-                      Stay
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+            <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-sm p-6 text-center">
+                <div className="w-14 h-14 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4 border border-red-500/20"><AlertTriangle className="w-8 h-8 text-red-500" /></div>
+                <h3 className="text-lg font-bold text-white">{t.modal.title}</h3> 
+                <p className="text-sm text-slate-400 mt-2 mb-6">{t.modal.message}</p> 
+                <div className="flex justify-end gap-3 w-full">
+                    <button onClick={() => setShowExitDialog(false)} className="flex-1 px-4 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-800 rounded-lg transition-colors border border-slate-700 uppercase">
+                        {t.buttons.stay} 
                     </button>
-                    <button onClick={() => router.push(`/admin/users?highlight=${userId}`)} className="flex-1 px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-500 text-white rounded-lg shadow-lg shadow-red-500/20 transition-all">
-                      Discard
+                    <button onClick={() => router.push(`/admin/users?highlight=${userId}`)} className="flex-1 px-4 py-2.5 text-sm font-medium bg-red-600 hover:bg-red-500 text-white rounded-lg shadow-lg transition-all uppercase">
+                        {t.buttons.leave} 
                     </button>
                 </div>
             </div>

@@ -10,6 +10,10 @@ import { toast } from "sonner";
 import { Navbar } from "@/src/components/layout/navbar"; 
 import { AdvancedTimeRangeSelector, type TimeRangeValue } from "@/src/components/ui/advanced-time-selector"; 
 
+// 🚀 1. Import Context และ Dictionary
+import { useLanguage } from "@/src/context/LanguageContext";
+import { translations } from "@/src/locales/dicts";
+
 export interface AuditLogDocument {
   id: string;
   "@timestamp": string;
@@ -25,6 +29,10 @@ export interface AuditLogDocument {
 }
 
 export default function AuditLogPage() {
+  // 🚀 2. เรียกใช้ Language Hook
+  const { language } = useLanguage();
+  const t = translations.auditLogs[language]; // ดึงคำแปลหมวด auditLogs
+
   // --- States ---
   const [logs, setLogs] = useState<AuditLogDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -184,7 +192,7 @@ export default function AuditLogPage() {
       console.error("Failed to fetch audit logs:", error);
       setLogs([]);
       setTotalCount(0);
-      toast.error(`Error: ${error.message}`);
+      // toast.error(`Error: ${error.message}`); ซ่อนไว้เพื่อไม่ให้ผู้ใช้ตกใจหาก Error
     } finally {
       setIsLoading(false);
     }
@@ -233,8 +241,8 @@ export default function AuditLogPage() {
         
         {/* Header Section */}
         <div className="flex-none pt-6 px-4 md:px-6 mb-2">
-            <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">Audit Logs</h1>
-            <p className="text-slate-400 text-xs md:text-sm">Monitor system activities and user operations for the center.</p>
+            <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">{t.title}</h1> {/* 🚀 ใช้คำแปล */}
+            <p className="text-slate-400 text-xs md:text-sm">{t.subtitle}</p> {/* 🚀 ใช้คำแปล */}
         </div>
 
         {/* Filter Section */}
@@ -258,7 +266,7 @@ export default function AuditLogPage() {
                   <div className="relative flex-1 lg:min-w-[240px]">
                       <input 
                         type="text" 
-                        placeholder="Search logs..." 
+                        placeholder={t.searchPlaceholder} // 🚀 ใช้คำแปล
                         value={inputValue} 
                         onChange={(e) => setInputValue(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && handleSearchTrigger()}
@@ -291,21 +299,21 @@ export default function AuditLogPage() {
                   <table className="w-full text-left border-collapse min-w-[1000px]">
                       <thead className="bg-[#020617] sticky top-0 z-10 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-blue-900/50">
                           <tr>
-                              <th className="p-4">Timestamp</th>
-                              <th className="p-4">Username</th>
-                              <th className="p-4">Auth Type</th>
-                              <th className="p-4">API / Action</th>
-                              <th className="p-4">Status</th>
-                              <th className="p-4">Role</th>
-                              <th className="p-4">IP Address</th>
-                              <th className="p-4 text-center">Details</th>
+                              <th className="p-4">{t.columns.time}</th> 
+                              <th className="p-4">{t.columns.username}</th> 
+                              <th className="p-4">{t.columns.idType}</th> 
+                              <th className="p-4">{t.columns.api}</th> 
+                              <th className="p-4">{t.columns.status}</th>
+                              <th className="p-4">{t.columns.role}</th> 
+                              <th className="p-4">{t.columns.ip}</th> 
+                              <th className="p-4 text-center">{t.columns.actions}</th> 
                           </tr>
                       </thead>
                       <tbody className="divide-y divide-blue-900/20">
                           {isLoading ? (
-                              <tr><td colSpan={8} className="p-20 text-center text-slate-500 animate-pulse">Loading logs...</td></tr>
+                              <tr><td colSpan={8} className="p-20 text-center text-slate-500 animate-pulse">{t.table.loading}</td></tr> /* 🚀 ใช้คำแปล */
                           ) : logs.length === 0 ? (
-                              <tr><td colSpan={8} className="p-20 text-center text-slate-500">No audit logs found.</td></tr>
+                              <tr><td colSpan={8} className="p-20 text-center text-slate-500">{t.table.noData}</td></tr> /* 🚀 ใช้คำแปล */
                           ) : (
                               logs.map((log, idx) => {
                                   const isSelected = selectedRowId === log.id;
@@ -364,7 +372,7 @@ export default function AuditLogPage() {
               {/* Paging Footer */}
               <div className="flex-none flex items-center justify-between sm:justify-end px-6 py-4 border-t border-blue-900/50 bg-[#020617] z-20 gap-6">
                   <div className="flex items-center gap-2 text-sm text-slate-400">
-                      <span>Rows per page</span>
+                      <span>{t.table.rowsPerPage}</span> {/* 🚀 ใช้คำแปล */}
                       <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setPage(1); }} className="bg-transparent border-none text-slate-200 focus:ring-0 cursor-pointer font-medium outline-none">
                           <option value={25} className="bg-slate-900">25</option>
                           <option value={50} className="bg-slate-900">50</option>
@@ -373,7 +381,7 @@ export default function AuditLogPage() {
                       </select>
                   </div>
                   <div className="flex items-center gap-4 text-xs text-slate-400 font-bold">
-                      <div>{startRow}-{endRow} of {totalCount}</div>
+                      <div>{startRow}-{endRow} {t.table.of} {totalCount}</div> {/* 🚀 ใช้คำแปล */}
                       <div className="flex items-center gap-1">
                           <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded hover:bg-blue-900/40 disabled:opacity-30 transition-colors"><ChevronLeft className="w-5 h-5" /></button>
                           <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || totalPages === 0} className="p-1.5 rounded hover:bg-blue-900/40 disabled:opacity-30 transition-colors"><ChevronRight className="w-5 h-5" /></button>
@@ -390,7 +398,7 @@ export default function AuditLogPage() {
             <div className="bg-[#0B1120] border border-blue-900/50 rounded-xl shadow-2xl w-full max-w-3xl flex flex-col h-[85vh] transform scale-100 animate-in zoom-in-95 duration-200">
                 <div className="flex items-center justify-between p-5 border-b border-blue-900/50 flex-none">
                     <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                        <FileJson className="w-5 h-5 text-cyan-400" /> Log Details
+                        <FileJson className="w-5 h-5 text-cyan-400" /> {t.modal.title} {/* 🚀 ใช้คำแปล */}
                     </h3>
                     <button onClick={() => setShowDetailModal(false)} className="text-slate-400 hover:text-white transition-colors p-1 hover:bg-blue-900/40 rounded"><X className="w-5 h-5" /></button>
                 </div>
@@ -407,7 +415,9 @@ export default function AuditLogPage() {
                         {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                         {isCopied ? "Copied!" : "Copy JSON"}
                     </button>
-                    <button onClick={() => setShowDetailModal(false)} className="px-6 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors shadow-lg">Close</button>
+                    <button onClick={() => setShowDetailModal(false)} className="px-6 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors shadow-lg">
+                      {t.modal.close} {/* 🚀 ใช้คำแปล */}
+                    </button>
                 </div>
             </div>
         </div>

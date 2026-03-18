@@ -5,6 +5,9 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { profileApi } from "@/src/modules/auth/api/profile.api"; 
 
+import { useLanguage } from "@/src/context/LanguageContext";
+import { translations } from "@/src/locales/dicts";
+
 interface ChangePasswordModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -14,6 +17,9 @@ export function ChangePasswordModal({
   isOpen,
   onClose,
 }: ChangePasswordModalProps) {
+  const { language } = useLanguage();
+  const t = translations.changePassword[language];
+
   const [isVisible, setIsVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -41,16 +47,16 @@ export function ChangePasswordModal({
 
   const validatePassword = (password: string) => {
     if (password.length < 7 || password.length > 15) {
-      return "Password must be 7-15 characters long."; 
+      return t.validateLength; 
     }
     if (!/[a-z]/.test(password)) {
-      return "Password must contain at least one lowercase letter."; 
+      return t.validateLower; 
     }
     if (!/[A-Z]/.test(password)) {
-      return "Password must contain at least one uppercase letter."; 
+      return t.validateUpper; 
     }
     if (!/[!@#]/.test(password)) {
-      return "Password must contain at least one special character (!, @, #)."; 
+      return t.validateSpecial; 
     }
     return null;
   };
@@ -59,7 +65,7 @@ export function ChangePasswordModal({
     const { currentPassword, newPassword, confirmPassword } = formData;
 
     if (!currentPassword || !newPassword || !confirmPassword) {
-      toast.error("Please fill in all fields."); 
+      toast.error(t.errorFields); 
       return;
     }
 
@@ -70,7 +76,7 @@ export function ChangePasswordModal({
     }
 
     if (newPassword !== confirmPassword) {
-      toast.error("New password and confirm password do not match."); 
+      toast.error(t.errorMismatch); 
       return;
     }
 
@@ -79,6 +85,12 @@ export function ChangePasswordModal({
     try {
       const orgId = localStorage.getItem("orgId") || "temp";
       const userName = localStorage.getItem("userName") || ""; 
+      
+      if (!userName) {
+        toast.error(t.errorUserNotFound); 
+        return;
+      }
+
       const payload = {
         userName: userName,
         currentPassword: currentPassword,
@@ -87,11 +99,11 @@ export function ChangePasswordModal({
 
       await profileApi.updatePassword(orgId, payload);
 
-      toast.success("Password changed successfully!");
+      toast.success(t.success);
       onClose(); 
     } catch (error: any) {
       console.error("Change password error:", error);
-      toast.error(error?.response?.data?.message || "Failed to change password. Please check your current password.");
+      toast.error(error?.response?.data?.message || t.errorFailed);
     } finally {
       setIsLoading(false);
     }
@@ -120,7 +132,7 @@ export function ChangePasswordModal({
         <div className="px-8 pt-8 pb-3 relative z-10">
           <div className="flex justify-between items-start">
             <h2 className="text-[22px] font-bold text-white tracking-tight">
-              Change Password
+              {t.title}
             </h2>
             <button
               onClick={onClose}
@@ -130,43 +142,43 @@ export function ChangePasswordModal({
             </button>
           </div>
           <p className="text-[12px] text-yellow-500/90 font-medium mt-1.5 tracking-wide">
-            Password must be 7-15 chars, contain A-Z, a-z, and special (!@#)
+            {t.desc}
           </p>
         </div>
 
         <div className="px-8 py-6 space-y-5 relative z-10">
           <div className="space-y-2">
-            <label className="text-[14px] font-bold text-white">Current Password</label>
+            <label className="text-[14px] font-bold text-white">{t.current}</label>
             <input
               type="password"
               name="currentPassword"
               value={formData.currentPassword}
               onChange={handleChange}
-              placeholder="Enter current password"
+              placeholder={t.ph_current}
               className="w-full px-4 py-3.5 bg-[#020617] border border-blue-900/40 rounded-xl outline-none text-slate-200 placeholder:text-slate-700 focus:border-blue-500/50 transition-all shadow-inner"
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-[14px] font-bold text-white">New Password</label>
+            <label className="text-[14px] font-bold text-white">{t.new}</label>
             <input
               type="password"
               name="newPassword"
               value={formData.newPassword}
               onChange={handleChange}
-              placeholder="Enter new password"
+              placeholder={t.ph_new}
               className="w-full px-4 py-3.5 bg-[#020617] border border-blue-900/40 rounded-xl outline-none text-slate-200 placeholder:text-slate-700 focus:border-blue-500/50 transition-all shadow-inner"
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-[14px] font-bold text-white">Confirm New Password</label>
+            <label className="text-[14px] font-bold text-white">{t.confirm}</label>
             <input
               type="password"
               name="confirmPassword"
               value={formData.confirmPassword}
               onChange={handleChange}
-              placeholder="Confirm new password"
+              placeholder={t.ph_confirm}
               className="w-full px-4 py-3.5 bg-[#020617] border border-blue-900/40 rounded-xl outline-none text-slate-200 placeholder:text-slate-700 focus:border-blue-500/50 transition-all shadow-inner"
             />
           </div>
@@ -179,7 +191,7 @@ export function ChangePasswordModal({
             disabled={isLoading}
             className="px-7 py-2.5 text-[14px] font-bold text-red-500 bg-red-950/20 border border-red-900/40 rounded-xl hover:bg-red-900/40 transition-all uppercase tracking-wider disabled:opacity-50"
           >
-            Cancel
+            {t.cancel}
           </button>
           
           <button
@@ -190,10 +202,10 @@ export function ChangePasswordModal({
             {isLoading ? (
                <>
                  <Loader2 className="w-5 h-5 animate-spin" />
-                 Saving...
+                 {t.saving}
                </>
             ) : (
-               "Save"
+               t.save
             )}
           </button>
         </div>
