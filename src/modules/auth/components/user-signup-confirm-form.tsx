@@ -94,7 +94,7 @@ export function UserSignupConfirmForm({
 
         <div className="h-px bg-blue-900/20 my-2" />
 
-        {/* First & Last Name Section (Stacked) */}
+        {/* First & Last Name Section */}
         <div className="space-y-4">
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-slate-300 ml-1">First Name <span className="text-red-500">*</span></label>
