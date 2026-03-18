@@ -2,16 +2,13 @@
 
 import { Navbar } from "@/src/components/layout/navbar";
 import { ComingSoon } from "@/src/components/ui/coming-soon";
-
-// 🚀 1. Import Context และ Dictionary
 import { useLanguage } from "@/src/context/LanguageContext";
 import { translations } from "@/src/locales/dicts";
 
 export default function OverviewPage() {
-  // 🚀 2. เรียกใช้งาน Language Hook
   const { language } = useLanguage();
   const t = translations.overview[language];
-  const tAudit = translations.auditLog[language]; // ดึงคำว่า Coming Soon จากหมวดอื่นมาใช้ร่วมกันได้ครับ
+  const tAudit = translations.auditLog[language];
 
   return (
     <div className="flex flex-col h-screen bg-[#020617] text-blue-100 font-sans overflow-hidden">

@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
 import { Globe, ChevronDown, Check } from "lucide-react";
+import { useLanguage } from "@/src/context/LanguageContext";
 
 export function NavbarClean() {
-  const [language, setLanguage] = useState("EN");
+  const { language, setLanguage } = useLanguage();
+  
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
   const langDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -39,6 +41,7 @@ export function NavbarClean() {
             </Link>
           </div>
 
+          {/* Language Selector */}
           <div className="relative" ref={langDropdownRef}>
             <button 
               onClick={() => setIsLangDropdownOpen(!isLangDropdownOpen)} 

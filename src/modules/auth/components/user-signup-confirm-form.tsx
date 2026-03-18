@@ -28,6 +28,7 @@ export function UserSignupConfirmForm({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const t = dictionary?.userSignup || {};
+  const labels = t.labels || {};
   const reqsDict = dictionary?.passwordRequirements || {};
   const decodedUserInfo = dictionary?.userInfo || {};
 
@@ -59,13 +60,13 @@ export function UserSignupConfirmForm({
       });
 
       if (response?.status === "OK" || response === "OK") {
-        toast.success(t.success || "Registration Completed Successfully");
+        toast.success(t.success);
         setTimeout(() => router.push("/login"), 1500);
       } else {
-        throw new Error(response?.description || "Signup failed");
+        throw new Error(response?.description || t.error);
       }
     } catch (err: any) {
-      toast.error(err?.response?.data?.description || err?.message || "Error");
+      toast.error(err?.response?.data?.description || err?.message || t.error);
     } finally {
       setIsSubmitting(false);
     }
@@ -74,20 +75,20 @@ export function UserSignupConfirmForm({
   return (
     <div className="w-full">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-white mb-2 tracking-tight">{t.title || "Complete Your Registration"}</h1>
-        <p className="text-slate-400 text-sm">{t.subtitle || "Please fill in your details to complete registration"}</p>
+        <h1 className="text-2xl font-bold text-white mb-2 tracking-tight">{t.title}</h1>
+        <p className="text-slate-400 text-sm">{t.subHeader}</p> 
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         
-        {/* Read Only */}
+        {/* Read Only Section */}
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-300 ml-1">{t.username || "Username"}</label>
+            <label className="text-sm font-medium text-slate-300 ml-1">{labels.username}</label>
             <input type="text" value={username} disabled className="w-full bg-[#0f172a] border border-blue-900/20 text-slate-500 text-sm rounded-lg px-4 py-2.5 cursor-not-allowed select-none" />
           </div>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-300 ml-1">{t.email || "Email"}</label>
+            <label className="text-sm font-medium text-slate-300 ml-1">{labels.email}</label>
             <input type="text" value={email} disabled className="w-full bg-[#0f172a] border border-blue-900/20 text-slate-500 text-sm rounded-lg px-4 py-2.5 cursor-not-allowed select-none" />
           </div>
         </div>
@@ -97,29 +98,30 @@ export function UserSignupConfirmForm({
         {/* First & Last Name Section */}
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-300 ml-1">First Name <span className="text-red-500">*</span></label>
+            <label className="text-sm font-medium text-slate-300 ml-1">{labels.firstName} <span className="text-red-500">*</span></label>
             <input 
               {...register("firstName")} 
-              placeholder="John"
+              placeholder={labels.firstName}
               className={`w-full bg-[#162032] border ${errors.firstName ? 'border-red-500/50 focus:border-red-500' : 'border-blue-900/30 focus:border-cyan-500/50'} text-white text-sm rounded-lg px-4 py-2.5 outline-none transition-all`} 
             />
-            {errors.firstName && <p className="text-red-500 text-xs ml-1 mt-1">This field is required</p>}
+            {errors.firstName && <p className="text-red-500 text-xs ml-1 mt-1">{t.required}</p>}
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-300 ml-1">Last Name <span className="text-red-500">*</span></label>
+            <label className="text-sm font-medium text-slate-300 ml-1">{labels.lastName} <span className="text-red-500">*</span></label>
             <input 
               {...register("lastName")} 
-              placeholder="Doe"
+              placeholder={labels.lastName}
               className={`w-full bg-[#162032] border ${errors.lastName ? 'border-red-500/50 focus:border-red-500' : 'border-blue-900/30 focus:border-cyan-500/50'} text-white text-sm rounded-lg px-4 py-2.5 outline-none transition-all`} 
             />
-            {errors.lastName && <p className="text-red-500 text-xs ml-1 mt-1">This field is required</p>}
+            {errors.lastName && <p className="text-red-500 text-xs ml-1 mt-1">{t.required}</p>}
           </div>
         </div>
 
+        {/* Password Section */}
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-300 ml-1">Password <span className="text-red-500">*</span></label>
+            <label className="text-sm font-medium text-slate-300 ml-1">{labels.password} <span className="text-red-500">*</span></label>
             <div className="relative">
               <input 
                 {...register("password")} 
@@ -135,7 +137,7 @@ export function UserSignupConfirmForm({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-slate-300 ml-1">Confirm Password <span className="text-red-500">*</span></label>
+            <label className="text-sm font-medium text-slate-300 ml-1">{labels.confirmPassword} <span className="text-red-500">*</span></label>
             <div className="relative">
               <input 
                 {...register("confirmPassword")} 
@@ -147,18 +149,18 @@ export function UserSignupConfirmForm({
                 {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
-            {errors.confirmPassword && <p className="text-red-500 text-xs ml-1 mt-1">Passwords do not match</p>}
+            {errors.confirmPassword && <p className="text-red-500 text-xs ml-1 mt-1">{t.passwordMismatch}</p>}
           </div>
         </div>
 
-        {/* Password Requirements Box (Blue BG) */}
+        {/* Password Requirements Box */}
         <div className="bg-blue-950/40 border border-blue-500/30 rounded-xl p-5 mt-2">
-          <h4 className="text-[13px] font-bold text-blue-300 mb-3 tracking-wide">{reqsDict.title || "Password Requirements:"}</h4>
+          <h4 className="text-[13px] font-bold text-blue-300 mb-3 tracking-wide">{reqsDict.title}</h4>
           <ul className="space-y-1.5 ml-1">
-            <ReqItem isValid={reqs.length} text={reqsDict.req1 || "Password must be between 7-15 characters"} />
-            <ReqItem isValid={reqs.upper} text={reqsDict.req2 || "Password must contain at least one uppercase letter"} />
-            <ReqItem isValid={reqs.lower} text={reqsDict.req3 || "Password must contain at least one lowercase letter"} />
-            <ReqItem isValid={reqs.special} text={reqsDict.req4 || "Password must contain at least one special character"} />
+            <ReqItem isValid={reqs.length} text={reqsDict.length} />
+            <ReqItem isValid={reqs.upper} text={reqsDict.upper} />
+            <ReqItem isValid={reqs.lower} text={reqsDict.lower} />
+            <ReqItem isValid={reqs.special} text={reqsDict.special} />
           </ul>
         </div>
 
@@ -166,15 +168,20 @@ export function UserSignupConfirmForm({
         <button 
           type="submit" 
           disabled={isSubmitting} 
-          className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl py-4 transition-all shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2"
+          className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl py-4 transition-all shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2 uppercase text-sm tracking-wider"
         >
-          {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : (t.submit || "Complete Registration")}
+          {isSubmitting ? (
+            <>
+              <Loader2 className="animate-spin h-5 w-5" />
+              <span>{t.processing}</span>
+            </>
+          ) : t.submit}
         </button>
 
         {/* Footer with Divider */}
         <div className="pt-6 border-t border-blue-900/30 mt-4">
           <p className="text-[11px] text-slate-500 text-center leading-relaxed">
-            {t.terms || "By completing registration, you agree to our Terms of Service and Privacy Policy."}
+            {t.registrationTermsAndExpiry} 
           </p>
         </div>
       </form>
