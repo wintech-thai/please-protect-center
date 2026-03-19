@@ -53,6 +53,7 @@ export default function UsersPage() {
   const [showResetLinkModal, setShowResetLinkModal] = useState(false);
   const [generatedLink, setGeneratedLink] = useState("");
   const [targetUser, setTargetUser] = useState<UserItem | null>(null);
+  const [isGeneratingLink, setIsGeneratingLink] = useState(false);
 
   const rowRefs = useRef<{ [key: string]: HTMLTableRowElement | null }>({});
 
@@ -153,10 +154,43 @@ export default function UsersPage() {
     }
   };
 
-  const handleResetPasswordLink = (user: UserItem) => {
-    setTargetUser(user); 
-    setGeneratedLink(`https://please-protect.center/reset?token=mock_${Math.random().toString(36).substr(2, 9)}`);
-    setShowResetLinkModal(true);
+  // 🚀 เปลี่ยนมาใช้ userApi แทนครับ
+  const handleResetPasswordLink = async (user: UserItem) => {
+    if (user.userStatus !== "Active") return;
+    
+    const orgId = localStorage.getItem("orgId") || "temp";
+
+    try {
+      // แสดง Toast Loading
+      toast.loading(t.toast?.generatingLink || "Generating reset link...", { id: "gen-link" });
+      
+      // ดึงลิงก์จาก API
+      const response: any = await userApi.getForgotPasswordLink(orgId, user.orgUserId);
+      
+      // ปิด Toast Loading
+      toast.dismiss("gen-link");
+
+      if (response && response.forgotPasswordUrl) {
+        // จัดการเรื่อง Domain เหมือนที่คุณเขียนไว้
+        const appUrl = process.env.NEXT_PUBLIC_APP_DOMAIN || window.location.host;
+        const domain = appUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        const finalLink = response.forgotPasswordUrl.replace('<REGISTER_SERVICE_DOMAIN>', domain);
+        
+        setGeneratedLink(finalLink);
+        setTargetUser(user);
+        
+        // 🚀 เปิด Modal เมื่อได้ลิงก์เรียบร้อยแล้ว
+        setShowResetLinkModal(true);
+      } else {
+        toast.error(t.toast?.invalidResponse || "Invalid response from server.");
+      }
+
+    } catch (error: any) {
+      toast.dismiss("gen-link");
+      console.error("Reset link error:", error);
+      const errorMsg = error?.response?.data?.description || error?.message || t.toast?.resetLinkError || "Failed to generate reset link";
+      toast.error(errorMsg);
+    }
   };
 
   const copyToClipboard = async () => {
@@ -361,7 +395,7 @@ export default function UsersPage() {
                     <button onClick={() => { setShowStatusConfirm(false); setTargetUser(null); }} className="flex-1 px-4 py-2 text-sm font-medium text-slate-300 bg-slate-800 rounded-lg border border-slate-700 transition-colors">
                       {t.buttons.cancel}
                     </button>
-                    <button onClick={handleToggleStatus} className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg shadow-lg hover:bg-blue-500 transition-all">
+                    <button onClick={handleToggleStatus} className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg shadow-lg hover:bg-red-500 transition-all">
                       {t.buttons.ok}
                     </button>
                 </div>
@@ -389,23 +423,50 @@ export default function UsersPage() {
         </div>
       )}
 
+      {/* Reset Password Link Modal */}
       {showResetLinkModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-[#0B1120] border border-blue-900/50 rounded-xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-bold text-white uppercase tracking-wider">{t.modal.resetPasswordTitle}</h3>
-                    <button onClick={() => setShowResetLinkModal(false)}><X className="w-5 h-5 text-slate-500 hover:text-white transition-colors" /></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200 p-4">
+            <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-md p-6 transform scale-100 animate-in zoom-in-95 duration-200">
+                <div className="flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-bold text-white">
+                          {t.modal?.resetPasswordTitle || "Reset Password Link"}
+                        </h3>
+                        <button onClick={() => setShowResetLinkModal(false)} className="text-slate-400 hover:text-white transition-colors">
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+                    
+                    <p className="text-sm text-slate-400">
+                        {(t.modal?.resetPasswordMessage || "Copy the link below and send it to {name} to reset their password.")
+                          .replace("{name}", targetUser?.userName || "")}
+                    </p>
+
+                    <div className="relative">
+                        <input 
+                            type="text" 
+                            readOnly 
+                            value={generatedLink} 
+                            className="w-full bg-slate-950 border border-slate-700 text-slate-300 text-sm rounded-lg pl-3 pr-12 py-3 focus:outline-none focus:border-blue-500"
+                        />
+                        <button 
+                            onClick={copyToClipboard}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-slate-800 rounded-md text-slate-400 hover:text-white transition-colors"
+                            title={t.buttons?.copy || "Copy to clipboard"}
+                        >
+                            <Copy className="w-4 h-4" />
+                        </button>
+                    </div>
+
+                    <div className="flex justify-end pt-2">
+                        <button 
+                            onClick={() => setShowResetLinkModal(false)} 
+                            className="px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
+                        >
+                            {t.buttons?.done || "Done"}
+                        </button>
+                    </div>
                 </div>
-                <p className="text-sm text-slate-400 mb-4">
-                    {t.modal.resetPasswordMessage.replace("{name}", targetUser?.userName || "the user")}
-                </p>
-                <div className="relative mb-6">
-                    <input type="text" readOnly value={generatedLink} className="w-full bg-[#020617] border border-blue-900/50 text-cyan-400 text-xs rounded-md pl-3 pr-10 py-3 outline-none focus:border-cyan-500 transition-colors" />
-                    <button onClick={copyToClipboard} className="absolute right-2 top-2.5 p-1 text-slate-500 hover:text-cyan-400 transition-colors"><Copy className="w-4 h-4" /></button>
-                </div>
-                <button onClick={() => setShowResetLinkModal(false)} className="w-full py-2.5 bg-blue-600 text-white font-bold rounded-md uppercase text-sm hover:bg-blue-500 transition-all shadow-lg">
-                  {t.buttons.done}
-                </button>
             </div>
         </div>
       )}

@@ -54,7 +54,7 @@ export function UpdateProfileModal({ isOpen, onClose }: UpdateProfileModalProps)
       setIsFetching(true);
       try {
         const orgId = localStorage.getItem("orgId") || "temp";
-        const userName = localStorage.getItem("userName") || "admin_super"; 
+        const userName = localStorage.getItem("user_name") || localStorage.getItem("username") || "admin_super";
 
         const res = await profileApi.getUserByUserName(orgId, userName);
         

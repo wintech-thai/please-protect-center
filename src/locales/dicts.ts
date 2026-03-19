@@ -100,6 +100,7 @@ export const translations = {
       successDesc: "Your password has been successfully updated. You can now log in.",
       passwordMismatch: "Passwords do not match",
       success: "Password reset successfully",
+      email: "Email",
       backToLogin: "Back to Login"
     },
     TH: {
@@ -112,6 +113,7 @@ export const translations = {
       successDesc: "รหัสผ่านของคุณได้รับการอัปเดตเรียบร้อยแล้ว คุณสามารถเข้าสู่ระบบได้ทันที",
       passwordMismatch: "รหัสผ่านไม่ตรงกัน",
       success: "เปลี่ยนรหัสผ่านสำเร็จ",
+      email: "อีเมล",
       backToLogin: "กลับไปหน้าเข้าสู่ระบบ"
     }
   },

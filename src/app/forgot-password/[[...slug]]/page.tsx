@@ -1,12 +1,11 @@
 import React from 'react'
 import { NavbarClean } from '@/src/components/layout/navbar-clean'
-import UserSignupConfirmView from '@/src/modules/auth/views/user-signup-confirm.view'
-
+import ForgotPasswordForm from '@/src/modules/auth/views/forgot-password.view'
 const page = () => {
   return (
     <div>
         <NavbarClean />
-        <UserSignupConfirmView />
+        <ForgotPasswordForm />
     </div>
   )
 }

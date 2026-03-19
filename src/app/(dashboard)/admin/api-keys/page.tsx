@@ -365,7 +365,7 @@ export default function ApiKeysPage() {
                                                         disabled={apiKey.status === 'Active'}
                                                         className={`px-3 py-2 text-sm font-medium rounded text-left transition-all ${
                                                           apiKey.status !== 'Active' 
-                                                            ? 'text-slate-300 hover:bg-slate-800 hover:text-white' 
+                                                            ? 'text-green-400 hover:bg-green-500/10' 
                                                             : 'text-slate-500 cursor-not-allowed opacity-60'
                                                         }`}
                                                     >

@@ -6,11 +6,11 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
-import { userApi } from "@/src/modules/auth/api/user.api";
 import {
-  userSignupFormSchema,
-  UserSignupFormData,
-} from "@/src/modules/auth/schema/signup-confirm.schema";
+  resetPasswordSchema,
+  ResetPasswordFormData,
+} from "@/src/modules/auth/schema/forgot-password.schema";
+import { userApi } from "@/src/modules/auth/api/user.api";
 
 // --- Helper Component ---
 const ReqBullet = ({ isValid, text }: { isValid: boolean; text: string }) => (
@@ -24,45 +24,41 @@ const ReqBullet = ({ isValid, text }: { isValid: boolean; text: string }) => (
   </li>
 );
 
-export interface UserSignupConfirmFormProps {
+export interface CustomerResetPasswordFormProps {
   organization: string;
   token: string;
   username: string;
-  email: string;
-  orgUserId?: string;
-  dictionary?: any;
+  email?: string;
+  dictionary: any;
+  customerId: string;
 }
 
-export default function UserSignupConfirmForm({
+export default function CustomerResetPasswordForm({
   organization,
   token,
   username,
   email,
-  orgUserId,
   dictionary,
-}: UserSignupConfirmFormProps) {
+  customerId,
+}: CustomerResetPasswordFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const t = dictionary?.userSignup || {};
-  const reqsDict = dictionary?.passwordRequirements || {};
+  const t = dictionary?.forms?.customerResetPassword || {};
+  const common = dictionary?.forms?.common || {};
+  const reqsDict = dictionary?.forms?.passwordRequirements || {};
 
   const {
     register,
     handleSubmit,
-    watch,
     formState: { errors },
-  } = useForm<UserSignupFormData>({
-    resolver: zodResolver(userSignupFormSchema),
+    watch,
+  } = useForm<ResetPasswordFormData>({
+    resolver: zodResolver(resetPasswordSchema),
     mode: "onChange",
-    defaultValues: {
-      firstName: "",
-      lastName: "",
-      password: "",
-      confirmPassword: "",
-    },
+    defaultValues: { password: "", confirmPassword: "" },
   });
 
   const password = watch("password") || "";
@@ -75,52 +71,56 @@ export default function UserSignupConfirmForm({
   };
 
   const texts = {
-    title: t.title || "Complete Your Profile",
-    subHeader: t.subHeader || "Please fill in your details to continue",
-    usernameLabel: t.labels?.username || "Username",
-    emailLabel: t.labels?.email || "Email",
-    firstNameLabel: t.labels?.firstName || "First Name",
-    lastNameLabel: t.labels?.lastName || "Last Name",
-    passwordLabel: t.labels?.password || "Password",
-    confirmLabel: t.labels?.confirmPassword || "Confirm Password",
-    btnSubmit: t.submit || "Complete Registration",
+    title: t.title || "Reset Your Password",
+    subHeader: t.subHeader || "Please enter a new password for your account",
+    usernameLabel: common.username || "Username",
+    emailLabel: t.email || "Email",
+    passwordLabel: common.newPassword || "New Password",
+    confirmLabel: common.confirmNewPassword || "Confirm New Password",
+    btnSubmit: t.submitButton || "Reset Password",
     processing: t.processing || "Processing...",
-    success: t.success || "Registration Completed Successfully",
-    error: t.error || "Registration Failed. Please try again.",
-    required: t.required || "This field is required",
     passwordMismatch: t.passwordMismatch || "Passwords do not match",
-    reqTitle: reqsDict.title || "Password Requirements:",
-    req1: reqsDict.length || "7-15 characters",
-    req2: reqsDict.upper || "At least one uppercase letter",
-    req3: reqsDict.lower || "At least one lowercase letter",
-    req4: reqsDict.special || "One special character (!, @, #)",
+    success: t.success || "Password Reset Successfully",
+    error: t.error || "Failed to reset password.",
 
-    firstNamePlaceholder: "John",
-    lastNamePlaceholder: "Doe",
+    reqTitle: reqsDict.title || "Password Requirements:",
+    req1: reqsDict.length || "Password must be between 7-15 characters",
+    req2:
+      reqsDict.upper || "Password must contain at least one uppercase letter",
+    req3:
+      reqsDict.lower || "Password must contain at least one lowercase letter",
+    req4:
+      reqsDict.special ||
+      "Password must contain at least one special character (!, @, or #)",
+
     passwordPlaceholder: "*******",
     confirmPlaceholder: "*******",
   };
 
-  const onSubmit = async (data: UserSignupFormData) => {
+  const onSubmit = async (data: ResetPasswordFormData) => {
     setIsSubmitting(true);
     try {
-      const response = await userApi.confirmInvite(organization, token, {
-        username: username,
-        email: email,
+      const response = await userApi.confirmResetPassword(organization, token, {
         password: data.password,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        orgUserId: orgUserId,
+        username: username,
+        email: email || "",
+        orgUserId: customerId,
       });
 
       if (response?.status === "INVALID_TOKEN_OR_EXPIRED") {
-        throw new Error(response.description || "Invalid or expired token");
+        throw new Error(
+          response.description ||
+            "Invalid or expired token. Please request a new password reset link.",
+        );
       }
 
       toast.success(texts.success);
-      setTimeout(() => router.push("/login"), 1500);
+
+      setTimeout(() => {
+        router.push("/login");
+      }, 1500);
     } catch (err: any) {
-      console.error("Signup failed:", err);
+      console.error("Reset failed:", err);
       const msg = err?.message || err?.response?.data?.message || texts.error;
       toast.error(msg);
     } finally {
@@ -139,26 +139,28 @@ export default function UserSignupConfirmForm({
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-        {/* --- Read Only Section --- */}
         <div className="space-y-4">
+          {/* Username */}
           <div className="space-y-1.5">
             <label className="text-sm text-slate-300 font-medium ml-1">
               {texts.usernameLabel}
             </label>
             <input
               type="text"
-              value={username}
+              value={username || ""}
               disabled
               className="w-full bg-[#0f1623] border border-blue-900/20 text-slate-400 text-sm rounded-md px-3 py-2.5 cursor-not-allowed select-none"
             />
           </div>
+
+          {/* Email */}
           <div className="space-y-1.5">
             <label className="text-sm text-slate-300 font-medium ml-1">
               {texts.emailLabel}
             </label>
             <input
               type="text"
-              value={email}
+              value={email || ""}
               disabled
               className="w-full bg-[#0f1623] border border-blue-900/20 text-slate-400 text-sm rounded-md px-3 py-2.5 cursor-not-allowed select-none"
             />
@@ -168,45 +170,9 @@ export default function UserSignupConfirmForm({
         {/* --- Divider --- */}
         <div className="pt-2 border-t border-blue-900/10"></div>
 
-        {/* --- Profile Inputs --- */}
+        {/* --- Password Inputs --- */}
         <div className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-sm text-slate-300 font-medium ml-1">
-              {texts.firstNameLabel} <span className="text-red-500">*</span>
-            </label>
-            <input
-              {...register("firstName")}
-              type="text"
-              disabled={isSubmitting}
-              placeholder={texts.firstNamePlaceholder}
-              className={`w-full bg-[#162032] border text-blue-50 text-sm rounded-md px-3 py-2.5 outline-none transition-all focus:border-cyan-500/50 placeholder:text-slate-600 ${
-                errors.firstName ? "border-red-500/50" : "border-blue-900/30"
-              }`}
-            />
-            {errors.firstName && (
-              <p className="text-red-400 text-xs ml-1">{texts.required}</p>
-            )}
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-sm text-slate-300 font-medium ml-1">
-              {texts.lastNameLabel} <span className="text-red-500">*</span>
-            </label>
-            <input
-              {...register("lastName")}
-              type="text"
-              disabled={isSubmitting}
-              placeholder={texts.lastNamePlaceholder}
-              className={`w-full bg-[#162032] border text-blue-50 text-sm rounded-md px-3 py-2.5 outline-none transition-all focus:border-cyan-500/50 placeholder:text-slate-600 ${
-                errors.lastName ? "border-red-500/50" : "border-blue-900/30"
-              }`}
-            />
-            {errors.lastName && (
-              <p className="text-red-400 text-xs ml-1">{texts.required}</p>
-            )}
-          </div>
-
-          {/* --- Password Inputs --- */}
+          {/* New Password */}
           <div className="space-y-1.5">
             <label className="text-sm text-slate-300 font-medium ml-1">
               {texts.passwordLabel} <span className="text-red-500">*</span>
@@ -234,13 +200,9 @@ export default function UserSignupConfirmForm({
                 )}
               </button>
             </div>
-            {/* {errors.password && (
-              <p className="text-red-400 text-xs ml-1">
-                {errors.password.message}
-              </p>
-            )} */}
           </div>
 
+          {/* Confirm Password */}
           <div className="space-y-1.5">
             <label className="text-sm text-slate-300 font-medium ml-1">
               {texts.confirmLabel} <span className="text-red-500">*</span>
@@ -306,6 +268,7 @@ export default function UserSignupConfirmForm({
             texts.btnSubmit
           )}
         </button>
+
         <div className="mt-6 pt-6 border-t border-blue-500/20">
           <p className="text-xs text-gray-500 text-center">
             {t.registrationTermsAndExpiry}

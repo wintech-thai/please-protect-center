@@ -84,7 +84,7 @@ export function ChangePasswordModal({
     
     try {
       const orgId = localStorage.getItem("orgId") || "temp";
-      const userName = localStorage.getItem("userName") || ""; 
+      const userName = localStorage.getItem("user_name") || localStorage.getItem("username") || "";
       
       if (!userName) {
         toast.error(t.errorUserNotFound); 

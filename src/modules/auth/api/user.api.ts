@@ -7,9 +7,6 @@ import {
   GetUsersResponse 
 } from "./types";
 
-
-
-
 export const userApi = {
   getUsers: async (orgId: string, payload: GetUsersPayload): Promise<GetUsersResponse> => {
     const response = await client.post(`/api/OrganizationUser/org/${orgId}/action/GetUsers`, payload);
@@ -60,11 +57,49 @@ export const userApi = {
     return response.data;
   },
 
-  confirmInvite: async (orgId: string, token: string, userName: string, data: any) => {
-  const response = await client.post(
-    `/api/Registration/org/${orgId}/action/ConfirmNewUserInvitation/${token}/${userName}`,
-    data
-  );
-  return response.data;
-},
+  confirmInvite: async (orgId: string, token: string, payload: any) => {
+    const url = `/api/Registration/org/${orgId}/action/ConfirmNewUserInvitation/${token}/${payload.username}`;
+    const body = {
+      Email: payload.email,
+      UserName: payload.username,
+      Password: payload.password,
+      Name: payload.firstName,
+      LastName: payload.lastName,
+      OrgUserId: payload.orgUserId
+    };
+    const response = await client.post(url, body);
+    return response.data;
+  },
+
+  getForgotPasswordLink: async (orgId: string, userId: string): Promise<string> => {
+    const response = await client.get(`/api/OrganizationUser/org/${orgId}/action/GetForgotPasswordLink/${userId}`);
+    return response.data;
+  },
+
+  confirmResetPassword: async (
+    orgId: string, 
+    token: string, 
+    payload: { 
+      password: string; 
+      username: string; 
+      email: string;      
+      orgUserId: string;  
+    }
+  ) => {
+    
+    const url = `/api/Registration/org/${orgId}/action/ConfirmForgotPasswordReset/${token}/${payload.username}`;
+
+    const body = {
+      Password: payload.password,
+      UserName: payload.username,
+      Email: payload.email,         
+      OrgUserId: payload.orgUserId, 
+    };
+
+    console.log("🚀 Calling API:", url);
+    console.log("📦 Payload:", body);
+
+    const response = await client.post(url, body);
+    return response.data;
+  },
 };
