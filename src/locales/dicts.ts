@@ -999,7 +999,7 @@ export const translations = {
         cancel: "Cancel",
         leave: "Leave",
         stay: "Cancel",
-        done: "Done & Return to Users"
+        done: "Done"
       },
       modal: {
         title: "Leave Page",
