@@ -167,7 +167,7 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
       }
       localStorage.setItem("orgId", org.id);
       document.cookie = `orgId=${org.id}; path=/; max-age=86400; SameSite=Lax`;
-      toast.success(`Switched to ${org.name}`, { id: loadingId });
+      toast.success(`Switched to ${org.name}`, { id: loadingId , duration: 10000 });
       window.location.reload();
     } catch (error) {
       toast.error("Session expired.", { id: loadingId });
