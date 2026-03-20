@@ -70,7 +70,7 @@ export const translations = {
       organization: "Organization",
       username: "Username",
       newPassword: "New Password",
-      confirmNewPassword: "Confirm New Password"
+      confirmNewPassword: "Confirm New Password",
     },
     TH: {
       search: "ค้นหา",
@@ -88,7 +88,7 @@ export const translations = {
       confirmNewPassword: "ยืนยันรหัสผ่านใหม่"
     }
   },
-
+  
   customerResetPassword: {
     EN: {
       title: "Reset Your Password",
@@ -118,6 +118,15 @@ export const translations = {
     }
   },
 
+  organization: {
+    EN: {
+      switchedSuccess: "Switched to {orgName}",
+    },
+    TH: {
+      switchedSuccess: "เปลี่ยนหน่วยงานเป็น {orgName} สำเร็จ",
+    },
+  },
+
   passwordRequirements: {
     EN: {
       title: "Password Requirements:",
@@ -132,6 +141,39 @@ export const translations = {
       upper: "รหัสผ่านต้องมีตัวพิมพ์ใหญ่อย่างน้อย 1 ตัว",
       lower: "รหัสผ่านต้องมีตัวพิมพ์เล็กอย่างน้อย 1 ตัว",
       special: "รหัสผ่านต้องมีอักขระพิเศษอย่างน้อย 1 ตัว (!, @, หรือ #)"
+    }
+  },
+  
+  inviteConfirm: {
+    EN: {
+      subtitle: "Organization Invitation",
+      error: "Invalid or missing invitation link.",
+      loadingVerify: "Verifying invitation...",
+      inviteMessage: "You have been invited to join the organization",
+      username: "Username",
+      email: "Email",
+      invitedBy: "Invited by:",
+      systemAdmin: "System Admin",
+      acceptButton: "Accept Invitation",
+      confirmingButton: "Confirming...",
+      toastSuccess: "Successfully joined the organization! Please log in.",
+      toastError: "Unable to confirm invitation. The link may have expired.",
+      toastLoading: "Confirming invitation..."
+    },
+    TH: {
+      subtitle: "ยืนยันการเข้าร่วมหน่วยงาน",
+      error: "ลิงก์คำเชิญไม่ถูกต้อง หรือข้อมูลสูญหาย",
+      loadingVerify: "กำลังตรวจสอบคำเชิญ...",
+      inviteMessage: "คุณได้รับคำเชิญให้เข้าร่วมหน่วยงาน",
+      username: "ผู้ใช้งาน (Username)",
+      email: "อีเมล (Email)",
+      invitedBy: "ได้รับคำเชิญโดย:",
+      systemAdmin: "ผู้ดูแลระบบ",
+      acceptButton: "ยอมรับคำเชิญ",
+      confirmingButton: "กำลังยืนยัน...",
+      toastSuccess: "เข้าร่วมหน่วยงานสำเร็จ! กรุณาเข้าสู่ระบบ",
+      toastError: "ไม่สามารถยืนยันคำเชิญได้ ลิงก์อาจหมดอายุ",
+      toastLoading: "กำลังยืนยันคำเชิญ..."
     }
   },
 

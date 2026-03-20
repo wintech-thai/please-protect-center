@@ -244,7 +244,7 @@ export default function ApiKeysPage() {
                     href={selectedRowId ? `/admin/api-keys/create?prevHighlight=${selectedRowId}` : "/admin/api-keys/create"} 
                     className="flex-1 lg:flex-none"
                   >
-                      <button className="w-full justify-center px-8 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg uppercase transition-all shadow-lg shadow-blue-900/20">{t.buttons.add}</button> {/* 🚀 ใช้คำแปล */}
+                      <button className="w-full justify-center px-8 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg uppercase transition-all shadow-lg shadow-blue-900/20">{t.buttons.add}</button>
                   </Link>
                   <button 
                     onClick={() => setShowDeleteConfirm(true)}
@@ -275,9 +275,9 @@ export default function ApiKeysPage() {
                       </thead>
                       <tbody className="divide-y divide-blue-900/20">
                           {isLoading ? (
-                              <tr><td colSpan={7} className="p-20 text-center text-slate-500 animate-pulse">{t.loading}</td></tr> /* 🚀 ใช้คำแปล */
+                              <tr><td colSpan={7} className="p-20 text-center text-slate-500 animate-pulse">{t.loading}</td></tr>
                           ) : keys.length === 0 ? (
-                              <tr><td colSpan={7} className="p-20 text-center text-slate-500 font-medium italic">{t.noData}</td></tr> /* 🚀 ใช้คำแปล */
+                              <tr><td colSpan={7} className="p-20 text-center text-slate-500 font-medium">{t.noData}</td></tr>
                           ) : (
                               keys.map((apiKey) => {
                                   const isSelected = selectedRowId === apiKey.id;
@@ -303,14 +303,20 @@ export default function ApiKeysPage() {
 
                                           <td className="p-4 px-6 text-slate-400 text-sm max-w-[300px] truncate">{apiKey.description}</td>
                                           
-                                          <td className="p-4 px-6 text-slate-400 font-medium italic">{apiKey.customRole}</td>
+                                          <td className="p-4 px-6 text-slate-400 font-medium">{apiKey.customRole}</td>
                                           
                                           <td className="p-4 px-6">
-                                              {apiKey.roles && apiKey.roles !== "-" ? (
-                                                  <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-600/20 border border-blue-600/30 text-blue-300 rounded uppercase">{apiKey.roles}</span>
-                                              ) : (
-                                                  <span className="text-slate-500">-</span>
-                                              )}
+                                              <div className="flex flex-wrap gap-1">
+                                                  {apiKey.roles && apiKey.roles !== "-" ? (
+                                                      apiKey.roles.split(',').map((role: string, i: number) => (
+                                                          <span key={i} className="bg-blue-600 px-2 py-1 rounded-md text-[10px] font-semibold text-white">
+                                                              {role.trim()}
+                                                          </span>
+                                                      ))
+                                                  ) : (
+                                                      <span className="text-slate-500">-</span>
+                                                  )}
+                                              </div>
                                           </td>
 
                                           <td className="p-4 px-6 font-medium">

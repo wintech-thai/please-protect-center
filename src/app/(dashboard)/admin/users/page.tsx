@@ -154,24 +154,19 @@ export default function UsersPage() {
     }
   };
 
-  // 🚀 เปลี่ยนมาใช้ userApi แทนครับ
   const handleResetPasswordLink = async (user: UserItem) => {
     if (user.userStatus !== "Active") return;
     
     const orgId = localStorage.getItem("orgId") || "temp";
 
     try {
-      // แสดง Toast Loading
       toast.loading(t.toast?.generatingLink || "Generating reset link...", { id: "gen-link" });
       
-      // ดึงลิงก์จาก API
       const response: any = await userApi.getForgotPasswordLink(orgId, user.orgUserId);
       
-      // ปิด Toast Loading
       toast.dismiss("gen-link");
 
       if (response && response.forgotPasswordUrl) {
-        // จัดการเรื่อง Domain เหมือนที่คุณเขียนไว้
         const appUrl = process.env.NEXT_PUBLIC_APP_DOMAIN || window.location.host;
         const domain = appUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
         const finalLink = response.forgotPasswordUrl.replace('<REGISTER_SERVICE_DOMAIN>', domain);
@@ -179,7 +174,6 @@ export default function UsersPage() {
         setGeneratedLink(finalLink);
         setTargetUser(user);
         
-        // 🚀 เปิด Modal เมื่อได้ลิงก์เรียบร้อยแล้ว
         setShowResetLinkModal(true);
       } else {
         toast.error(t.toast?.invalidResponse || "Invalid response from server.");
@@ -311,7 +305,21 @@ export default function UsersPage() {
                                               <span key={i} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/10 text-blue-300 border border-blue-500/20">{tag}</span>
                                           ))}</div></td>
                                           <td className="p-4 text-slate-400">{user.customRoleName || "-"}</td>
-                                          <td className="p-4"><span className="bg-blue-600 px-2 py-1 rounded-md text-[10px] font-semibold text-white">{user.rolesList || "-"}</span></td>
+                                          
+                                          <td className="p-4">
+                                              <div className="flex flex-wrap gap-1">
+                                                  {user.rolesList ? (
+                                                      user.rolesList.split(',').map((role, i) => (
+                                                          <span key={i} className="bg-blue-600 px-2 py-1 rounded-md text-[10px] font-semibold text-white">
+                                                              {role.trim()}
+                                                          </span>
+                                                      ))
+                                                  ) : (
+                                                      <span className="text-slate-500">-</span>
+                                                  )}
+                                              </div>
+                                          </td>
+
                                           <td className="p-4 text-center">{user.isOrgInitialUser === "YES" ? <Check className="w-4 h-4 text-emerald-400 mx-auto" /> : <X className="w-4 h-4 text-slate-600 mx-auto" />}</td>
                                           <td className="p-4 font-medium"><span className={user.userStatus === 'Disabled' ? 'text-slate-500' : 'text-emerald-400'}>{user.userStatus || "Active"}</span></td>
                                           
@@ -386,7 +394,7 @@ export default function UsersPage() {
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
             <div className="bg-[#0B1120] border border-blue-900/50 rounded-xl shadow-2xl w-full max-w-sm p-6 text-center animate-in zoom-in-95">
                 <h3 className="text-lg font-bold text-white mb-2">
-                    {targetUser?.userStatus === "Disabled" ? t.modal.enableTitle : t.modal.disableTitle} {/* 🚀 ใช้คำแปล */}
+                    {targetUser?.userStatus === "Disabled" ? t.modal.enableTitle : t.modal.disableTitle}
                 </h3>
                 <p className="text-sm text-slate-400 mb-6">
                     {t.modal.statusMessage.replace("{action}", targetUser?.userStatus === "Disabled" ? "enable" : "disable")}

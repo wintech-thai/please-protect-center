@@ -71,6 +71,19 @@ export const userApi = {
     return response.data;
   },
 
+  confirmExistingUserInvite: async (orgId: string, token: string, username: string, payload: any) => {
+    const url = `/api/Registration/org/${orgId}/action/ConfirmExistingUserInvitation/${token}/${username}`;
+    
+    const body = {
+      Email: payload.email,
+      UserName: payload.username,
+      OrgUserId: payload.orgUserId
+    };
+    
+    const response = await client.post(url, body);
+    return response.data;
+  },
+
   getForgotPasswordLink: async (orgId: string, userId: string): Promise<string> => {
     const response = await client.get(`/api/OrganizationUser/org/${orgId}/action/GetForgotPasswordLink/${userId}`);
     return response.data;

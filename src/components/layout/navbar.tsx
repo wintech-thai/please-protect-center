@@ -149,7 +149,9 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
     
     if (isMobileMenuOpen) setIsMobileMenuOpen(false);
 
-    const loadingId = toast.loading(`Switching to ${org.name}...`);
+    const loadingMsg = language === "TH" ? `กำลังสลับไปยัง ${org.name}...` : `Switching to ${org.name}...`;
+    const loadingId = toast.loading(loadingMsg);
+    
     try {
       const refreshToken = localStorage.getItem("refreshToken");
       const userName = localStorage.getItem("username") || "Admin";
@@ -167,10 +169,16 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
       }
       localStorage.setItem("orgId", org.id);
       document.cookie = `orgId=${org.id}; path=/; max-age=86400; SameSite=Lax`;
-      toast.success(`Switched to ${org.name}`, { id: loadingId , duration: 10000 });
-      window.location.reload();
+      
+      const successMsg = language === "TH" ? `เปลี่ยนหน่วยงานเป็น ${org.name} สำเร็จ` : `Switched to ${org.name}`;
+      toast.success(successMsg, { id: loadingId, duration: 2000 }); 
+      
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
     } catch (error) {
-      toast.error("Session expired.", { id: loadingId });
+      const errorMsg = language === "TH" ? "เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่" : "Session expired.";
+      toast.error(errorMsg, { id: loadingId });
       handleLogout();
     }
   };
