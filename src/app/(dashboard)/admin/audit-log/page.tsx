@@ -2,17 +2,16 @@
 
 import { useEffect, useState, useCallback } from "react";
 import {
-  Search, ChevronLeft, ChevronRight, Loader2, Eye, FileJson, X,
-  ChevronDown, RefreshCcw, Copy, Check
+  Search, ChevronLeft, ChevronRight, Eye, ChevronDown, RefreshCcw
 } from "lucide-react";
 import { format, subMinutes, subHours, subDays } from "date-fns";
-import { toast } from "sonner";
 import { Navbar } from "@/src/components/layout/navbar"; 
 import { AdvancedTimeRangeSelector, type TimeRangeValue } from "@/src/components/ui/advanced-time-selector"; 
 
-// 🚀 1. Import Context และ Dictionary
 import { useLanguage } from "@/src/context/LanguageContext";
 import { translations } from "@/src/locales/dicts";
+
+import { AuditLogFlyout } from "@/src/components/ui/audit-log-flyout"; 
 
 export interface AuditLogDocument {
   id: string;
@@ -29,9 +28,9 @@ export interface AuditLogDocument {
 }
 
 export default function AuditLogPage() {
-  // 🚀 2. เรียกใช้ Language Hook
   const { language } = useLanguage();
-  const t = translations.auditLogs[language]; // ดึงคำแปลหมวด auditLogs
+  const t = translations.auditLogs[language]; 
+  const tFlyout = (translations as any).loki[language].flyout; 
 
   // --- States ---
   const [logs, setLogs] = useState<AuditLogDocument[]>([]);
@@ -50,29 +49,9 @@ export default function AuditLogPage() {
     label: "Last 24 hours"
   });
 
+  // State สำหรับควบคุม Flyout
   const [selectedLog, setSelectedLog] = useState<AuditLogDocument | null>(null);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [isCopied, setIsCopied] = useState(false);
-
-  const highlightJson = (json: object) => {
-    const jsonString = JSON.stringify(json, null, 2);
-    return jsonString.replace(
-      /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
-      (match) => {
-        let cls = 'text-[#ce9178]';
-        if (/^"/.test(match)) {
-          if (/:$/.test(match)) cls = 'text-[#9cdcfe]';
-        } else if (/true|false/.test(match)) {
-          cls = 'text-[#569cd6]';
-        } else if (/null/.test(match)) {
-          cls = 'text-[#569cd6]';
-        } else {
-          cls = 'text-[#b5cea8]';
-        }
-        return `<span class="${cls}">${match}</span>`;
-      }
-    );
-  };
+  const [selectedIndex, setSelectedIndex] = useState<number>(-1);
 
   const getOrgId = () => {
     if (typeof window !== 'undefined') {
@@ -192,7 +171,6 @@ export default function AuditLogPage() {
       console.error("Failed to fetch audit logs:", error);
       setLogs([]);
       setTotalCount(0);
-      // toast.error(`Error: ${error.message}`); ซ่อนไว้เพื่อไม่ให้ผู้ใช้ตกใจหาก Error
     } finally {
       setIsLoading(false);
     }
@@ -212,18 +190,26 @@ export default function AuditLogPage() {
     setTimeRange({ type: "relative", value: "24h", label: "Last 24 hours" });
     setPage(1);
   };
-  const openDetailModal = (log: AuditLogDocument) => {
+  
+  const handleOpenFlyout = (log: AuditLogDocument, index: number) => {
       setSelectedLog(log);
-      setIsCopied(false);
-      setShowDetailModal(true);
+      setSelectedIndex(index);
+      setSelectedRowId(log.id); 
   };
-  const handleCopyJson = () => {
-    if (selectedLog) {
-        navigator.clipboard.writeText(JSON.stringify(selectedLog, null, 2));
-        setIsCopied(true);
-        setTimeout(() => setIsCopied(false), 2000);
-    }
+
+  const handleCloseFlyout = () => {
+      setSelectedLog(null);
+      setSelectedIndex(-1);
   };
+
+  const handleNavigateFlyout = (newIndex: number) => {
+      if (newIndex >= 0 && newIndex < logs.length) {
+          setSelectedIndex(newIndex);
+          setSelectedLog(logs[newIndex]);
+          setSelectedRowId(logs[newIndex].id); 
+      }
+  };
+
   const formatDate = (isoString: string) => {
       try { return format(new Date(isoString), "M/d/yyyy, h:mm:ss a"); }
       catch (e) { return isoString || "-"; }
@@ -234,15 +220,15 @@ export default function AuditLogPage() {
   const endRow = Math.min(page * itemsPerPage, totalCount);
 
   return (
-    <div className="flex flex-col h-screen bg-[#020617] text-slate-200 font-sans overflow-hidden">
+    <div className="flex flex-col h-screen bg-[#020617] text-slate-200 font-sans overflow-hidden relative">
       <Navbar />
 
       <main className="flex-1 flex flex-col relative overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
         
         {/* Header Section */}
         <div className="flex-none pt-6 px-4 md:px-6 mb-2">
-            <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">{t.title}</h1> {/* 🚀 ใช้คำแปล */}
-            <p className="text-slate-400 text-xs md:text-sm">{t.subtitle}</p> {/* 🚀 ใช้คำแปล */}
+            <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">{t.title}</h1> 
+            <p className="text-slate-400 text-xs md:text-sm">{t.subtitle}</p> 
         </div>
 
         {/* Filter Section */}
@@ -266,7 +252,7 @@ export default function AuditLogPage() {
                   <div className="relative flex-1 lg:min-w-[240px]">
                       <input 
                         type="text" 
-                        placeholder={t.searchPlaceholder} // 🚀 ใช้คำแปล
+                        placeholder={t.searchPlaceholder} 
                         value={inputValue} 
                         onChange={(e) => setInputValue(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && handleSearchTrigger()}
@@ -311,13 +297,12 @@ export default function AuditLogPage() {
                       </thead>
                       <tbody className="divide-y divide-blue-900/20">
                           {isLoading ? (
-                              <tr><td colSpan={8} className="p-20 text-center text-slate-500 animate-pulse">{t.table.loading}</td></tr> /* 🚀 ใช้คำแปล */
+                              <tr><td colSpan={8} className="p-20 text-center text-slate-500 animate-pulse">{t.table.loading}</td></tr> 
                           ) : logs.length === 0 ? (
-                              <tr><td colSpan={8} className="p-20 text-center text-slate-500">{t.table.noData}</td></tr> /* 🚀 ใช้คำแปล */
+                              <tr><td colSpan={8} className="p-20 text-center text-slate-500">{t.table.noData}</td></tr> 
                           ) : (
                               logs.map((log, idx) => {
                                   const isSelected = selectedRowId === log.id;
-                                  
                                   const isError = log.status_code && log.status_code !== 200;
                                   
                                   return (
@@ -355,7 +340,7 @@ export default function AuditLogPage() {
                                           </td>
                                           <td className="p-4 text-center">
                                               <button 
-                                                onClick={(e) => { e.stopPropagation(); openDetailModal(log); }} 
+                                                onClick={(e) => { e.stopPropagation(); handleOpenFlyout(log, idx); }} 
                                                 className={`p-1.5 rounded-full transition-colors border border-transparent outline-none ${isError ? 'text-red-400 hover:text-red-200 hover:bg-red-500/20 hover:border-red-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800 hover:border-slate-700'}`}
                                               >
                                                   <Eye className="w-4 h-4" />
@@ -372,7 +357,7 @@ export default function AuditLogPage() {
               {/* Paging Footer */}
               <div className="flex-none flex items-center justify-between sm:justify-end px-6 py-4 border-t border-blue-900/50 bg-[#020617] z-20 gap-6">
                   <div className="flex items-center gap-2 text-sm text-slate-400">
-                      <span>{t.table.rowsPerPage}</span> {/* 🚀 ใช้คำแปล */}
+                      <span>{t.table.rowsPerPage}</span> 
                       <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setPage(1); }} className="bg-transparent border-none text-slate-200 focus:ring-0 cursor-pointer font-medium outline-none">
                           <option value={25} className="bg-slate-900">25</option>
                           <option value={50} className="bg-slate-900">50</option>
@@ -381,7 +366,7 @@ export default function AuditLogPage() {
                       </select>
                   </div>
                   <div className="flex items-center gap-4 text-xs text-slate-400 font-bold">
-                      <div>{startRow}-{endRow} {t.table.of} {totalCount}</div> {/* 🚀 ใช้คำแปล */}
+                      <div>{startRow}-{endRow} {t.table.of} {totalCount}</div> 
                       <div className="flex items-center gap-1">
                           <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded hover:bg-blue-900/40 disabled:opacity-30 transition-colors"><ChevronLeft className="w-5 h-5" /></button>
                           <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || totalPages === 0} className="p-1.5 rounded hover:bg-blue-900/40 disabled:opacity-30 transition-colors"><ChevronRight className="w-5 h-5" /></button>
@@ -392,36 +377,25 @@ export default function AuditLogPage() {
         </div>
       </main>
 
-      {/* JSON Detail Modal */}
-      {showDetailModal && selectedLog && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-[#0B1120] border border-blue-900/50 rounded-xl shadow-2xl w-full max-w-3xl flex flex-col h-[85vh] transform scale-100 animate-in zoom-in-95 duration-200">
-                <div className="flex items-center justify-between p-5 border-b border-blue-900/50 flex-none">
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                        <FileJson className="w-5 h-5 text-cyan-400" /> {t.modal.title} {/* 🚀 ใช้คำแปล */}
-                    </h3>
-                    <button onClick={() => setShowDetailModal(false)} className="text-slate-400 hover:text-white transition-colors p-1 hover:bg-blue-900/40 rounded"><X className="w-5 h-5" /></button>
-                </div>
-
-                <div className="flex-1 overflow-auto p-4 bg-[#020617] custom-scrollbar">
-                    <pre
-                      className="text-xs font-mono leading-relaxed whitespace-pre-wrap break-all select-text"
-                      dangerouslySetInnerHTML={{ __html: highlightJson(selectedLog) }}
-                    />
-                </div>
-
-                <div className="p-4 border-t border-blue-900/50 bg-[#0B1120] flex justify-between items-center flex-none">
-                    <button onClick={handleCopyJson} className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-white hover:bg-blue-900/40 rounded-md transition-colors border border-transparent hover:border-blue-900/50">
-                        {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                        {isCopied ? "Copied!" : "Copy JSON"}
-                    </button>
-                    <button onClick={() => setShowDetailModal(false)} className="px-6 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors shadow-lg">
-                      {t.modal.close} {/* 🚀 ใช้คำแปล */}
-                    </button>
-                </div>
-            </div>
-        </div>
-      )}
+      <AuditLogFlyout 
+        event={selectedLog} 
+        events={logs} 
+        currentIndex={selectedIndex} 
+        onNavigate={handleNavigateFlyout}
+        onClose={handleCloseFlyout}
+        dict={{
+          title: tFlyout?.title || "DOCUMENT DETAILS",
+          tabTable: tFlyout?.tabTable || "TABLE",
+          tabJson: tFlyout?.tabJson || "JSON",
+          searchPlaceholder: tFlyout?.searchPlaceholder || "Search field names or values...",
+          field: tFlyout?.field || "FIELD",
+          value: tFlyout?.value || "VALUE",
+          copyJson: tFlyout?.copyJson || "Copy JSON",
+          copied: tFlyout?.copied || "Copied!",
+          paginationOf: language === "TH" ? "จาก" : "of"
+        }}
+      />
+      
     </div>
   );
 }
