@@ -230,7 +230,6 @@ export const translations = {
       changePassword: "Change Password",
       logout: "Logout",
       logoutSuccess: "Logged out successfully",
-
       overview: "Overview",
       systemOverview: "System Overview",
       dataFlowOverview: "Data Flow Overview",
@@ -246,7 +245,6 @@ export const translations = {
       apiKeys: "API Keys",
       audit: "Audit Log",
       system: "System",
-
       language: "Language"
     },
     TH: {
@@ -254,7 +252,6 @@ export const translations = {
       changePassword: "เปลี่ยนรหัสผ่าน",
       logout: "ออกจากระบบ",
       logoutSuccess: "ออกจากระบบเรียบร้อยแล้ว",
-
       overview: "ภาพรวม",
       systemOverview: "ภาพรวมระบบ",
       dataFlowOverview: "ภาพรวมการไหลของข้อมูล",
@@ -270,7 +267,6 @@ export const translations = {
       apiKeys: "กุญแจ API",
       audit: "ตรวจสอบการใช้งาน",
       system: "ระบบ",
-
       language: "ภาษา"
     }
   },
@@ -849,7 +845,8 @@ export const translations = {
       },
       toast: {
         success: "Role updated successfully",
-        error: "Failed to update role",
+        error: "Failed to update role. Please verify your access permissions.",
+        permissionDenied: "Permission Denied: You do not have the right to edit roles.",
         loadError: "Failed to load role data"
       },
       validation: {
@@ -889,7 +886,8 @@ export const translations = {
       },
       toast: {
         success: "อัปเดตบทบาทสำเร็จ",
-        error: "อัปเดตบทบาทไม่สำเร็จ",
+        error: "อัปเดตบทบาทไม่สำเร็จ กรุณาตรวจสอบสิทธิ์การใช้งานของคุณ",
+        permissionDenied: "ปฏิเสธการเข้าถึง: คุณไม่มีสิทธิ์แก้ไขบทบาท โปรดติดต่อผู้ดูแลระบบ",
         loadError: "โหลดข้อมูลบทบาทไม่สำเร็จ"
       },
       validation: {
@@ -1157,7 +1155,8 @@ export const translations = {
         loadError: "Failed to load user information",
         dataNotFound: "User data not found",
         updateSuccess: "User updated successfully",
-        updateError: "Failed to update user",
+        updateError: "Failed to update user. You may not have sufficient permissions.",
+        permissionDenied: "Permission Denied: You do not have the right to edit users.",
         rolesError: "Failed to load roles configuration"
       },
       loading: "Loading user profile...",
@@ -1196,7 +1195,8 @@ export const translations = {
         loadError: "โหลดข้อมูลผู้ใช้ไม่สำเร็จ",
         dataNotFound: "ไม่พบข้อมูลผู้ใช้งาน",
         updateSuccess: "อัปเดตข้อมูลผู้ใช้สำเร็จ",
-        updateError: "อัปเดตข้อมูลผู้ใช้ไม่สำเร็จ",
+        updateError: "อัปเดตข้อมูลไม่สำเร็จ คุณอาจไม่มีสิทธิ์ในการทำรายการนี้",
+        permissionDenied: "ปฏิเสธการเข้าถึง: คุณไม่มีสิทธิ์แก้ไขผู้ใช้งาน โปรดติดต่อผู้ดูแลระบบ",
         rolesError: "โหลดข้อมูลบทบาทไม่สำเร็จ"
       },
       loading: "กำลังโหลดข้อมูลผู้ใช้...",
@@ -1204,6 +1204,7 @@ export const translations = {
       noRolesSelected: "ยังไม่ได้เลือกบทบาท"
     }
   },
+  
   apiKeys: {
     EN: {
       title: "API Keys",
@@ -1296,6 +1297,7 @@ export const translations = {
       noData: "ไม่พบข้อมูลคีย์ API"
     }
   },
+  
   createApiKey: {
     EN: {
       title: "Create API Key",
@@ -1394,6 +1396,7 @@ export const translations = {
       noRolesSelected: "ยังไม่ได้เลือกบทบาท"
     }
   },
+  
   updateApiKey: {
     EN: {
       title: "Update API Key",
@@ -1426,7 +1429,8 @@ export const translations = {
       },
       toast: {
         updateSuccess: "API Key updated successfully",
-        updateError: "Failed to update API key",
+        updateError: "Failed to update API key. Check your access permissions.",
+        permissionDenied: "Permission Denied: You do not have the right to edit API keys.",
         loadError: "Failed to load API key information",
         dataNotFound: "API Key data not found"
       },
@@ -1468,7 +1472,8 @@ export const translations = {
       },
       toast: {
         updateSuccess: "อัปเดตคีย์ API สำเร็จ",
-        updateError: "อัปเดตคีย์ API ไม่สำเร็จ",
+        updateError: "อัปเดตคีย์ API ไม่สำเร็จ คุณอาจไม่มีสิทธิ์ทำรายการนี้",
+        permissionDenied: "ปฏิเสธการเข้าถึง: คุณไม่มีสิทธิ์แก้ไขคีย์ API โปรดติดต่อผู้ดูแลระบบ",
         loadError: "โหลดข้อมูลคีย์ไม่สำเร็จ",
         dataNotFound: "ไม่พบข้อมูลคีย์ API"
       },
@@ -1480,6 +1485,7 @@ export const translations = {
       noRolesSelected: "ยังไม่ได้เลือกบทบาท"
     }
   },
+  
   auditLog: {
     EN: {
       title: "Audit Log",
@@ -1500,6 +1506,7 @@ export const translations = {
       of: "จาก"
     }
   },
+  
   userSignup: {
     EN: {
       title: "Complete Your Registration",
@@ -1759,7 +1766,7 @@ export const translations = {
     },
   },
 
-   timePicker: {
+  timePicker: {
     EN: {
       absoluteTitle: "Absolute Range",
       from: "From",
@@ -1930,6 +1937,7 @@ export const translations = {
       },
     },
   },
+  
   alertFired: {
     EN: {
       title: "Alerts Fired",
@@ -2045,6 +2053,7 @@ export const translations = {
       confirm: "ตัดการเชื่อมต่อและออก",
     },
   },
+  
   shellTerminal: {
     EN: {
       title: "Shell Terminal",
@@ -2097,6 +2106,7 @@ export const translations = {
       },
     },
   },
+  
   domainConfig: {
     EN: {
       title: "Settings",

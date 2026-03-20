@@ -131,7 +131,7 @@ client.interceptors.response.use(
 
     if (status === 403) {
        const forbiddenError = new AxiosError(
-          "Access denied.", "UNAUTHORIZED", originalRequest, error.request, errorResponse
+          "You do not have permission to perform this action.", "UNAUTHORIZED", originalRequest, error.request, errorResponse
        );
        return Promise.reject(forbiddenError);
     }
