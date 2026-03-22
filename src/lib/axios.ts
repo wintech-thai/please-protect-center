@@ -1,0 +1,206 @@
+import axios, { AxiosError, InternalAxiosRequestConfig, AxiosResponse } from "axios";
+import { toast } from "sonner"; 
+
+const API_URL = "/api/proxy";
+
+export const client = axios.create({
+  baseURL: API_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+let isRefreshing = false;
+let failedQueue: Array<{
+  resolve: (token: string) => void;
+  reject: (error: any) => void;
+}> = [];
+
+const processQueue = (error: any, token: string | null = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token!);
+    }
+  });
+  failedQueue = [];
+};
+
+// --- Helpers ---
+const encodeBase64 = (str: string): string => {
+  try {
+    if (typeof window !== "undefined" && window.btoa) {
+      return window.btoa(str);
+    }
+    return Buffer.from(str).toString("base64");
+  } catch (e) {
+    return str;
+  }
+};
+
+const setAuthCookies = (accessToken: string, refreshToken?: string) => {
+  if (typeof document === "undefined") return;
+  document.cookie = `accessToken=${accessToken}; path=/; max-age=86400; SameSite=Lax`;
+  if (refreshToken) {
+    document.cookie = `refreshToken=${refreshToken}; path=/; max-age=604800; SameSite=Lax`;
+  }
+};
+
+const clearAuthData = () => {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem("accessToken");
+  localStorage.removeItem("refreshToken");
+  localStorage.removeItem("username");
+  localStorage.removeItem("orgId");
+
+  document.cookie = "accessToken=; path=/; max-age=0; SameSite=Lax";
+  document.cookie = "refreshToken=; path=/; max-age=0; SameSite=Lax";
+  document.cookie = "user_name=; path=/; max-age=0; SameSite=Lax";
+  document.cookie = "orgId=; path=/; max-age=0; SameSite=Lax";
+};
+
+// --- Interceptors ---
+
+client.interceptors.request.use(
+  (config: InternalAxiosRequestConfig) => {
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("accessToken");
+      
+      const url = config.url?.toLowerCase() || "";
+      const isPublicPath = url.includes("login") || url.includes("registration");
+
+      if (token && config.headers && !isPublicPath) {
+        const encodedToken = encodeBase64(token);
+        config.headers.Authorization = `Bearer ${encodedToken}`;
+      }
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+client.interceptors.response.use(
+  (response: AxiosResponse) => {
+    const data = response.data;
+    if (!data) return response;
+
+    const { status, description, message } = data;
+    if (status === undefined || status === null) {
+      return response;
+    }
+
+    const statusUpper = typeof status === 'string' ? status.toUpperCase() : "";
+    const isSuccess = statusUpper === "OK" || statusUpper === "SUCCESS";
+
+    if (!isSuccess) {
+      const errorMsg = description || message || `Operation failed with status: ${statusUpper}`;
+      const customError = new AxiosError(
+        errorMsg, statusUpper, response.config, response.request, response
+      );
+      return Promise.reject(customError);
+    }
+
+    return response;
+  },
+  
+  async (error: AxiosError) => {
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean, _retryCount?: number };
+    const errorResponse = error.response;
+    const errorData = errorResponse?.data as any;
+    const status = errorResponse?.status;
+    const businessCode = error.code; 
+
+    const url = originalRequest?.url?.toLowerCase() || "";
+    const isPublicPath = url.includes("login") || url.includes("registration");
+
+    if (status === 429) {
+      originalRequest._retryCount = originalRequest._retryCount || 0;
+      if (originalRequest._retryCount < 3) {
+        originalRequest._retryCount += 1;
+        const waitTime = originalRequest._retryCount * 1000;
+        return new Promise((resolve) => {
+          setTimeout(() => resolve(client(originalRequest)), waitTime);
+        });
+      }
+      toast.error("Too many requests. Please wait.");
+      return Promise.reject({ ...error, isRateLimit: true });
+    }
+
+    if (isPublicPath) return Promise.reject(error);
+
+    if (status === 403) {
+       const forbiddenError = new AxiosError(
+          "You do not have permission to perform this action.", "UNAUTHORIZED", originalRequest, error.request, errorResponse
+       );
+       return Promise.reject(forbiddenError);
+    }
+
+    const isTokenExpired =
+      status === 401 ||
+      businessCode === "ERROR_TOKEN_EXPIRED" || 
+      (typeof errorData === "string" && (errorData.includes("IDX10223") || errorData.includes("expired"))) ||
+      (errorData?.raw && typeof errorData.raw === "string" && (errorData.raw.includes("IDX10223") || errorData.raw.includes("expired")));
+
+    if (!isTokenExpired || !originalRequest || originalRequest._retry) {
+      return Promise.reject(error);
+    }
+
+    if (isRefreshing) {
+      return new Promise<string>((resolve, reject) => {
+        failedQueue.push({ resolve, reject });
+      })
+        .then((token) => {
+          const encodedToken = encodeBase64(token);
+          if (originalRequest.headers) {
+            originalRequest.headers.Authorization = `Bearer ${encodedToken}`;
+          }
+          return client(originalRequest);
+        })
+        .catch((err) => Promise.reject(err));
+    }
+
+    originalRequest._retry = true;
+    isRefreshing = true;
+
+    try {
+      const refreshToken = localStorage.getItem("refreshToken");
+      const userName = localStorage.getItem("username") || "";
+
+      if (!refreshToken) throw new Error("No refresh token");
+
+      const res = await axios.post(`/api/proxy/api/Auth/org/temp/action/Refresh`, {
+        userName: userName,
+        refreshToken: refreshToken,
+      }, {
+        headers: { "Content-Type": "application/json" }
+      });
+
+      const tokenData = res.data.token || res.data;
+      const { access_token, refresh_token } = tokenData;
+
+      if (!access_token) throw new Error("No access token");
+
+      localStorage.setItem("accessToken", access_token);
+      if (refresh_token) localStorage.setItem("refreshToken", refresh_token);
+      setAuthCookies(access_token, refresh_token);
+
+      processQueue(null, access_token);
+
+      const newEncodedToken = encodeBase64(access_token);
+      if (originalRequest.headers) {
+        originalRequest.headers.Authorization = `Bearer ${newEncodedToken}`;
+      }
+
+      return client(originalRequest);
+
+    } catch (refreshError: any) {
+      processQueue(refreshError, null);
+      clearAuthData();
+      if (typeof window !== "undefined") window.location.href = "/login";
+      return Promise.reject(refreshError);
+    } finally {
+      isRefreshing = false;
+    }
+  }
+);
