@@ -32,4 +32,12 @@ export const auditLogApi = {
     );
     return response.data;
   },
+
+  searchAuditLogs: async (orgId: string, esPayload: any) => {
+    const response = await client.post(
+      `/api/AuditLog/org/${orgId}/action/GetAuditLogs`,
+      esPayload 
+    );
+    return response.data;
+  },
 };

@@ -12,6 +12,7 @@ import { useLanguage } from "@/src/context/LanguageContext";
 import { translations } from "@/src/locales/dicts";
 
 import { AuditLogFlyout } from "@/src/components/ui/audit-log-flyout"; 
+import { AuditLogHistogram } from "@/src/components/ui/audit-log-histogram";
 
 export interface AuditLogDocument {
   id: string;
@@ -26,6 +27,35 @@ export interface AuditLogDocument {
   client_ip: string;
   [key: string]: any;
 }
+
+const CHART_PALETTE = [
+  "#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8", 
+  "#82ca9d", "#f26ed5", "#a4de6c", "#d0ed57", "#ffc658"
+];
+
+const API_COLORS: { [key: string]: string } = {
+  "Heartbeat": "#3b82f6",         // สีน้ำเงิน
+  "GetAgents": "#ef4444",         // สีแดง/ชมพู
+  "GetAgentCount": "#f97316",     // สีส้ม
+  "GetUserCount": "#d946ef",      // สีชมพู
+  "UpdateAgentById": "#8b5cf6",   // สีม่วง
+  "GetCustomRoles": "#6366f1",    // สีม่วงเข้ม
+  "GetUsers": "#eab308",          // สีเหลือง
+  "GetRoles": "#22c55e",          // สีเขียว
+  "GetApiKeyCount": "#84cc16",    // สีเขียวอ่อน
+};
+
+const getApiColor = (apiName: string) => {
+  if (!apiName) return "#64748b"; // สีเทา
+  if (API_COLORS[apiName]) return API_COLORS[apiName];
+
+  let hash = 0;
+  for (let i = 0; i < apiName.length; i++) {
+    hash = apiName.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % CHART_PALETTE.length;
+  return CHART_PALETTE[index];
+};
 
 export default function AuditLogPage() {
   const { language } = useLanguage();
@@ -49,30 +79,34 @@ export default function AuditLogPage() {
     label: "Last 24 hours"
   });
 
-  // State สำหรับควบคุม Flyout
+  const [chartRawData, setChartRawData] = useState<any[]>([]);
+  const [chartMaxDocCount, setChartMaxDocCount] = useState<number>(1);
+  const [chartInterval, setChartInterval] = useState("30m");
+
   const [selectedLog, setSelectedLog] = useState<AuditLogDocument | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
 
   const getOrgId = () => {
-    if (typeof window !== 'undefined') {
-        return localStorage.getItem('orgId') || "";
-    }
+    if (typeof window !== 'undefined') return localStorage.getItem('orgId') || "";
     return "";
+  };
+
+  const calculateInterval = (val: string) => {
+    if (val.includes("m") || val === "1h") return "30s";
+    if (val === "24h" || val === "1d") return "30m";
+    if (val.includes("d")) return "1d";
+    return "1h";
   };
 
   const fetchData = useCallback(async () => {
     const orgId = getOrgId();
-    if (!orgId) {
-        setIsLoading(false);
-        return;
-    }
+    if (!orgId) { setIsLoading(false); return; }
 
     try {
       setIsLoading(true);
       const from = (page - 1) * itemsPerPage;
       const queryMust: any[] = [];
 
-      // Search Logic
       if (searchTerm) {
         if (searchField === "Full Text Search") {
              queryMust.push({
@@ -94,23 +128,26 @@ export default function AuditLogPage() {
       let gte: string | undefined;
       let lte: string | undefined;
       const now = new Date();
+      let currentInterval = "30m";
       
       if (timeRange.type === "absolute" && timeRange.start && timeRange.end) {
         gte = new Date(timeRange.start * 1000).toISOString();
         lte = new Date(timeRange.end * 1000).toISOString();
+        const diffHours = (timeRange.end - timeRange.start) / 3600;
+        currentInterval = diffHours <= 1 ? "30s" : diffHours <= 24 ? "30m" : "1d";
       } else {
         let startTime = subHours(now, 24);
         const rangeValue = timeRange.value;
         const num = parseInt(rangeValue.replace(/\D/g, "")) || 24;
         const unit = rangeValue.replace(/\d/g, "") || "h";
-
         if (unit === "m") startTime = subMinutes(now, num);
         if (unit === "h") startTime = subHours(now, num);
         if (unit === "d") startTime = subDays(now, num);
-        
         gte = startTime.toISOString();
+        currentInterval = calculateInterval(rangeValue);
       }
-
+      
+      setChartInterval(currentInterval);
       if (gte) {
         const rangeQuery: any = { gte };
         if (lte) rangeQuery.lte = lte;
@@ -122,19 +159,18 @@ export default function AuditLogPage() {
         size: itemsPerPage,
         sort: [{ "@timestamp": { order: "desc" } }],
         track_total_hits: true,
-        query: {
-            bool: {
-                must: queryMust.length > 0 ? queryMust : [{ match_all: {} }]
+        query: { bool: { must: queryMust.length > 0 ? queryMust : [{ match_all: {} }] } },
+        aggs: {
+            timeline: {
+                date_histogram: { field: "@timestamp", fixed_interval: currentInterval, min_doc_count: 0 },
+                aggs: { group_by_api: { terms: { field: "data.api.ApiName.keyword", size: 10 } } }
             }
         }
       };
 
       const response = await fetch('/api/audit-log', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'x-org-id': orgId
-        },
+        headers: { 'Content-Type': 'application/json', 'x-org-id': orgId },
         body: JSON.stringify({ esPayload: payload })
       });
 
@@ -145,7 +181,6 @@ export default function AuditLogPage() {
             const data = source.data || {};
             const userInfo = data.userInfo || data.user || {};
             const api = data.api || {};
-
             return {
                 id: source._id,
                 "@timestamp": source["@timestamp"],
@@ -160,53 +195,42 @@ export default function AuditLogPage() {
                 ...source
             } as AuditLogDocument;
         });
-
         setLogs(hits);
         setTotalCount(result.total);
-      } else {
-        throw new Error(result.message);
-      }
-
+        if (result.aggregations?.timeline?.buckets) {
+            const buckets = result.aggregations.timeline.buckets;
+            setChartRawData(buckets);
+            let maxCount = 1;
+            buckets.forEach((b: any) => { if (b.doc_count > maxCount) maxCount = b.doc_count; });
+            setChartMaxDocCount(maxCount);
+        } else { setChartRawData([]); }
+      } else { throw new Error(result.message); }
     } catch (error: any) {
       console.error("Failed to fetch audit logs:", error);
       setLogs([]);
       setTotalCount(0);
-    } finally {
-      setIsLoading(false);
-    }
+      setChartRawData([]);
+    } finally { setIsLoading(false); }
   }, [page, itemsPerPage, searchTerm, timeRange, searchField]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  // --- UI Handlers ---
   const handleRowClick = (id: string) => setSelectedRowId(id);
   const handleSearchTrigger = () => { setPage(1); setSearchTerm(inputValue); };
   const handleResetFilters = () => {
-    setInputValue("");
-    setSearchTerm("");
-    setSearchField("Full Text Search");
-    setTimeRange({ type: "relative", value: "24h", label: "Last 24 hours" });
-    setPage(1);
+    setInputValue(""); setSearchTerm(""); setSearchField("Full Text Search");
+    setTimeRange({ type: "relative", value: "24h", label: "Last 24 hours" }); setPage(1);
   };
   
   const handleOpenFlyout = (log: AuditLogDocument, index: number) => {
-      setSelectedLog(log);
-      setSelectedIndex(index);
-      setSelectedRowId(log.id); 
+      setSelectedLog(log); setSelectedIndex(index); setSelectedRowId(log.id); 
   };
 
-  const handleCloseFlyout = () => {
-      setSelectedLog(null);
-      setSelectedIndex(-1);
-  };
+  const handleCloseFlyout = () => { setSelectedLog(null); setSelectedIndex(-1); };
 
   const handleNavigateFlyout = (newIndex: number) => {
       if (newIndex >= 0 && newIndex < logs.length) {
-          setSelectedIndex(newIndex);
-          setSelectedLog(logs[newIndex]);
-          setSelectedRowId(logs[newIndex].id); 
+          setSelectedIndex(newIndex); setSelectedLog(logs[newIndex]); setSelectedRowId(logs[newIndex].id); 
       }
   };
 
@@ -225,29 +249,26 @@ export default function AuditLogPage() {
 
       <main className="flex-1 flex flex-col relative overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
         
-        {/* Header Section */}
-        <div className="flex-none pt-6 px-4 md:px-6 mb-2">
+        <div className="flex-none pt-4 px-4 md:px-6 mb-1">
             <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">{t.title}</h1> 
             <p className="text-slate-400 text-xs md:text-sm">{t.subtitle}</p> 
         </div>
 
-        {/* Filter Section */}
-        <div className="flex-none py-4">
-          <div className="flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center bg-[#0B1120] p-4 rounded-xl border border-blue-900/30 shadow-lg">
-              
+        <div className="flex-none">
+          <div className="flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center bg-[#0B1120] p-3 rounded-xl border border-blue-900/30 shadow-lg">
               <div className="flex flex-col sm:flex-row w-full lg:w-auto gap-2">
                   <div className="relative">
                       <select 
                           value={searchField}
                           onChange={(e) => setSearchField(e.target.value)}
-                          className="appearance-none bg-[#162032] border border-blue-900/50 text-slate-300 text-sm rounded-lg pl-3 pr-8 py-2.5 focus:outline-none transition-colors w-full sm:w-auto sm:min-w-[160px]"
+                          className="appearance-none bg-[#162032] border border-blue-900/50 text-slate-300 text-sm rounded-lg pl-3 pr-8 py-2 focus:outline-none transition-colors w-full sm:w-auto sm:min-w-[160px]"
                       >
-                          <option>Full Text Search</option>
-                          <option>Username</option>
-                          <option>API</option>
-                          <option>IP Address</option>
+                          <option value="Full Text Search">{language === "TH" ? "ค้นหาทั้งหมด" : "Full Text Search"}</option>
+                          <option value="Username">{t.columns.username}</option>
+                          <option value="API">{t.columns.api}</option>
+                          <option value="IP Address">{t.columns.ip}</option>
                       </select>
-                      <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3 top-3.5 pointer-events-none" />
+                      <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3 top-3 pointer-events-none" />
                   </div>
                   <div className="relative flex-1 lg:min-w-[240px]">
                       <input 
@@ -256,10 +277,10 @@ export default function AuditLogPage() {
                         value={inputValue} 
                         onChange={(e) => setInputValue(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && handleSearchTrigger()}
-                        className="w-full bg-[#162032] border border-blue-900/50 text-slate-200 text-sm rounded-lg pl-3 pr-10 py-2.5 focus:outline-none focus:border-cyan-500 transition-colors" 
+                        className="w-full bg-[#162032] border border-blue-900/50 text-slate-200 text-sm rounded-lg pl-3 pr-10 py-2 focus:outline-none focus:border-cyan-500 transition-colors" 
                       />
                   </div>
-                  <button onClick={handleSearchTrigger} className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg flex items-center justify-center">
+                  <button onClick={handleSearchTrigger} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg flex items-center justify-center">
                     <Search className="w-4 h-4" />
                   </button>
               </div>
@@ -270,29 +291,37 @@ export default function AuditLogPage() {
                     onChange={(val) => { setTimeRange(val); setPage(1); }}
                     disabled={isLoading}
                   />
-
-                  <button onClick={handleResetFilters} className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors flex items-center justify-center border border-slate-700">
+                  <button onClick={handleResetFilters} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors flex items-center justify-center border border-slate-700">
                       <RefreshCcw className="w-4 h-4" />
                   </button>
               </div>
           </div>
         </div>
 
-        {/* Table Section */}
+        <div className="flex-none">
+            <AuditLogHistogram 
+                data={chartRawData} 
+                totalHits={totalCount} 
+                interval={chartInterval} 
+                maxDocCount={chartMaxDocCount} 
+                dict={{ totalLogs: t.totalLogs }}
+            />
+        </div>
+
         <div className="flex-1 overflow-hidden flex flex-col min-h-0">
           <div className="flex-1 bg-[#0B1120] border border-blue-900/30 rounded-xl shadow-2xl overflow-hidden flex flex-col">
               <div className="flex-1 overflow-auto custom-scrollbar">
                   <table className="w-full text-left border-collapse min-w-[1000px]">
-                      <thead className="bg-[#020617] sticky top-0 z-10 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-blue-900/50">
+                      <thead className="bg-[#020617] sticky top-0 z-10 text-[13px] font-semibold text-slate-400 uppercase tracking-wider border-b border-blue-900/50">
                           <tr>
-                              <th className="p-4">{t.columns.time}</th> 
-                              <th className="p-4">{t.columns.username}</th> 
-                              <th className="p-4">{t.columns.idType}</th> 
-                              <th className="p-4">{t.columns.api}</th> 
-                              <th className="p-4">{t.columns.status}</th>
-                              <th className="p-4">{t.columns.role}</th> 
-                              <th className="p-4">{t.columns.ip}</th> 
-                              <th className="p-4 text-center">{t.columns.actions}</th> 
+                              <th className="p-3">{t.columns.time}</th> 
+                              <th className="p-3">{t.columns.username}</th> 
+                              <th className="p-3">{t.columns.idType}</th> 
+                              <th className="p-3">{t.columns.api}</th> 
+                              <th className="p-3">{t.columns.status}</th>
+                              <th className="p-3">{t.columns.role}</th> 
+                              <th className="p-3">{t.columns.ip}</th> 
+                              <th className="p-3 text-center">{t.columns.actions}</th> 
                           </tr>
                       </thead>
                       <tbody className="divide-y divide-blue-900/20">
@@ -305,45 +334,55 @@ export default function AuditLogPage() {
                                   const isSelected = selectedRowId === log.id;
                                   const isError = log.status_code && log.status_code !== 200;
                                   
+                                  const apiColor = getApiColor(log.action);
+
                                   return (
                                       <tr 
                                           key={log.id || idx} 
                                           onClick={() => handleRowClick(log.id)}
-                                          className={`transition-all duration-300 group text-sm cursor-pointer 
-                                            ${isError ? "bg-red-500/10 hover:bg-red-500/20" : "hover:bg-blue-900/10"} 
-                                            ${isSelected && !isError ? "bg-blue-900/20 border-l-4 border-l-cyan-400" : ""}
-                                            ${isSelected && isError ? "bg-red-500/30 border-l-4 border-l-red-500" : ""}
-                                            ${!isSelected && isError ? "border-l-4 border-l-red-500/50" : ""}
-                                            ${!isSelected && !isError ? "border-l-4 border-l-transparent" : ""}
+                                          className={`transition-all duration-300 group text-xs cursor-pointer 
+                                              ${isError ? "bg-red-500/10 hover:bg-red-500/20" : "hover:bg-blue-900/10"} 
+                                              ${isSelected && !isError ? "bg-blue-900/20 border-l-4 border-l-cyan-400" : ""}
+                                              ${isSelected && isError ? "bg-red-500/30 border-l-4 border-l-red-500" : ""}
+                                              ${!isSelected && isError ? "border-l-4 border-l-red-500/50" : "border-l-4 border-l-transparent"}
                                           `}
                                       >
-                                          <td className={`p-4 whitespace-nowrap font-mono text-xs ${isError ? 'text-red-300' : 'text-slate-400'}`}>
+                                          <td className={`p-3 whitespace-nowrap font-medium text-[13px] ${isError ? 'text-red-300' : 'text-slate-400'}`}>
                                               {formatDate(log["@timestamp"])}
                                           </td>
-                                          <td className={`p-4 font-medium ${isError ? 'text-red-400' : 'text-blue-400'}`}>
+                                          <td className={`p-3 font-medium text-[13px] ${isError ? 'text-red-400' : 'text-blue-400'}`}>
                                               {log.user_name || "-"}
                                           </td>
-                                          <td className="p-4">
+                                          <td className="p-3 font-medium text-[13px]">
                                               <span className={isError ? 'text-red-200' : 'text-slate-300'}>{log.id_type || "JWT"}</span>
                                           </td>
-                                          <td className={`p-4 ${isError ? 'text-red-200' : 'text-slate-300'}`}>
+
+                                          <td className={`p-3 font-medium text-[13px] flex items-center gap-2 ${isError ? 'text-red-200' : 'text-slate-300'}`}>
+                                              {!isError && (
+                                                <span 
+                                                  className="w-2.5 h-2.5 rounded-full inline-block" 
+                                                  style={{ backgroundColor: apiColor }} 
+                                                  title={`API: ${log.action}`}
+                                                />
+                                              )}
                                               {log.action || "-"}
                                           </td>
-                                          <td className={`p-4 font-mono font-bold ${isError ? 'text-red-500' : 'text-slate-200'}`}>
+
+                                          <td className={`p-3 font-medium text-[13px] ${isError ? 'text-red-500' : 'text-slate-200'}`}>
                                               {log.status_code || 200}
                                           </td>
-                                          <td className={`p-4 ${isError ? 'text-red-300' : 'text-slate-400'}`}>
+                                          <td className={`p-3 font-medium text-[13px] ${isError ? 'text-red-300' : 'text-slate-400'}`}>
                                               {log.role || "-"}
                                           </td>
-                                          <td className={`p-4 font-mono text-xs ${isError ? 'text-red-400' : 'text-slate-500'}`}>
+                                          <td className={`p-3 font-medium text-[13px] ${isError ? 'text-red-400' : 'text-slate-500'}`}>
                                               {log.client_ip || "-"}
                                           </td>
-                                          <td className="p-4 text-center">
+                                          <td className="p-3 font-medium text-center text-[13px]">
                                               <button 
-                                                onClick={(e) => { e.stopPropagation(); handleOpenFlyout(log, idx); }} 
-                                                className={`p-1.5 rounded-full transition-colors border border-transparent outline-none ${isError ? 'text-red-400 hover:text-red-200 hover:bg-red-500/20 hover:border-red-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800 hover:border-slate-700'}`}
+                                                  onClick={(e) => { e.stopPropagation(); handleOpenFlyout(log, idx); }} 
+                                                  className={`p-1 rounded-full transition-colors border border-transparent outline-none ${isError ? 'text-red-400 hover:text-red-200 hover:bg-red-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
                                               >
-                                                  <Eye className="w-4 h-4" />
+                                                  <Eye className="w-3.5 h-3.5" />
                                               </button>
                                           </td>
                                       </tr>
@@ -354,9 +393,8 @@ export default function AuditLogPage() {
                   </table>
               </div>
               
-              {/* Paging Footer */}
-              <div className="flex-none flex items-center justify-between sm:justify-end px-6 py-4 border-t border-blue-900/50 bg-[#020617] z-20 gap-6">
-                  <div className="flex items-center gap-2 text-sm text-slate-400">
+              <div className="flex-none flex items-center justify-between sm:justify-end px-6 py-3 border-t border-blue-900/50 bg-[#020617] z-20 gap-6">
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
                       <span>{t.table.rowsPerPage}</span> 
                       <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setPage(1); }} className="bg-transparent border-none text-slate-200 focus:ring-0 cursor-pointer font-medium outline-none">
                           <option value={25} className="bg-slate-900">25</option>
@@ -365,11 +403,11 @@ export default function AuditLogPage() {
                           <option value={200} className="bg-slate-900">200</option>
                       </select>
                   </div>
-                  <div className="flex items-center gap-4 text-xs text-slate-400 font-bold">
+                  <div className="flex items-center gap-4 text-[11px] text-slate-400 font-bold">
                       <div>{startRow}-{endRow} {t.table.of} {totalCount}</div> 
                       <div className="flex items-center gap-1">
-                          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded hover:bg-blue-900/40 disabled:opacity-30 transition-colors"><ChevronLeft className="w-5 h-5" /></button>
-                          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || totalPages === 0} className="p-1.5 rounded hover:bg-blue-900/40 disabled:opacity-30 transition-colors"><ChevronRight className="w-5 h-5" /></button>
+                          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-1 rounded hover:bg-blue-900/40 disabled:opacity-30"><ChevronLeft className="w-4 h-4" /></button>
+                          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || totalPages === 0} className="p-1 rounded hover:bg-blue-900/40 disabled:opacity-30"><ChevronRight className="w-4 h-4" /></button>
                       </div>
                   </div>
               </div>
@@ -378,11 +416,8 @@ export default function AuditLogPage() {
       </main>
 
       <AuditLogFlyout 
-        event={selectedLog} 
-        events={logs} 
-        currentIndex={selectedIndex} 
-        onNavigate={handleNavigateFlyout}
-        onClose={handleCloseFlyout}
+        event={selectedLog} events={logs} currentIndex={selectedIndex} 
+        onNavigate={handleNavigateFlyout} onClose={handleCloseFlyout}
         dict={{
           title: tFlyout?.title || "DOCUMENT DETAILS",
           tabTable: tFlyout?.tabTable || "TABLE",
@@ -395,7 +430,6 @@ export default function AuditLogPage() {
           paginationOf: language === "TH" ? "จาก" : "of"
         }}
       />
-      
     </div>
   );
 }
