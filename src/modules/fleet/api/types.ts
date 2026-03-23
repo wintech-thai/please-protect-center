@@ -5,7 +5,7 @@ export interface GetAgentsPayload {
 }
 
 export interface AddAgentPayload {
-  AgentCode: string;
+  Code: string;
   Description: string;
-  Tag?: string; 
+  Tags: string; 
 }

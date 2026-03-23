@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
-import { ChevronLeft, X, Loader2, AlertTriangle, Cpu, Tag as TagIcon } from "lucide-react";
+import { ChevronLeft, X, Loader2, AlertTriangle, Cpu, Tag as TagIcon, Tags } from "lucide-react";
 import { Navbar } from "@/src/components/layout/navbar";
 import { toast } from "sonner"; 
 import { agentApi } from "@/src/modules/fleet/api/agent.api";
@@ -109,9 +109,9 @@ export default function UpdateSensorPage() {
       if (tagInput.trim() && !finalTags.includes(tagInput.trim())) finalTags.push(tagInput.trim());
 
       const payload = { 
-        Code: formData.agentCode, 
-        Description: formData.description, 
-        Tags: finalTags.join(",") 
+        Code: formData.agentCode,
+        Description: formData.description,
+        Tags: finalTags.join(","),
       };
 
       const response = await agentApi.updateAgentById(orgId, sensorId, payload);
