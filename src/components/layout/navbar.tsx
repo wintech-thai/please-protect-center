@@ -18,6 +18,7 @@ import {
   PanelLeft,
   Building2,
   Search,
+  Cpu,
 } from "lucide-react";
 import { useState, useMemo, useEffect, useRef } from "react";
 import {
@@ -34,8 +35,11 @@ import { toast } from "sonner";
 
 import { useLanguage } from "@/src/context/LanguageContext";
 import { translations } from "@/src/locales/dicts";
+import { agentTranslations } from "@/src/locales/agentdict";
 
 import { AppVersionDisplay } from "./app-version-display";
+
+import { cn } from "@/src/lib/utils";
 
 // --- Interfaces ---
 interface OrgItem {
@@ -57,13 +61,17 @@ interface NavItem {
 interface NavbarProps {
   hasSidebar?: boolean;
   onToggleSidebar?: () => void;
+  className?: string; // Add className prop
+  style?: React.CSSProperties; // Add style prop
 }
 
-export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
+export function Navbar({ hasSidebar, onToggleSidebar, className, style }: NavbarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { language, setLanguage } = useLanguage();
+  
   const t = translations.navbar[language];
+  const at = agentTranslations.navbar[language];
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -196,6 +204,15 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
 
   const navItems: NavItem[] = useMemo(() => [
     { label: t.overview, href: "/overview", children: [{ label: t.systemOverview, href: "/overview", icon: <Layers className="w-4 h-4 mr-2" /> }] },
+    
+    { 
+      label: at.fleetManagement,
+      href: "/fleet/sensor", 
+      children: [
+        { label: at.sensors, href: "/fleet/sensor", icon: <Cpu className="w-4 h-4 mr-2" /> }
+      ] 
+    },
+
     { label: t.administrator, href: "/admin/users", children: [
         { label: t.roles, href: "/admin/custom-roles", icon: <ShieldAlert className="w-4 h-4 mr-2" /> },
         { label: t.users, href: "/admin/users", icon: <Users className="w-4 h-4 mr-2" /> },
@@ -209,9 +226,15 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
 
   return (
     <>
-      <nav className="fixed top-0 left-0 right-0 z-50 h-16 bg-[#0B1120]/90 backdrop-blur-md border-b border-blue-900/30 shadow-lg shadow-black/40 text-blue-100">
-        <div className="container mx-auto px-4 h-full flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      <nav 
+        className={cn(
+          "fixed top-0 left-0 right-0 z-50 h-16 bg-[#0B1120]/90 backdrop-blur-md border-b border-blue-900/30 shadow-lg shadow-black/40 text-blue-100",
+          className // Apply passed className
+        )}
+        style={style} // Apply passed style
+      >
+        <div className="container mx-auto px-3 h-full flex items-center justify-between">
+          <div className="flex items-center gap-2">
             {hasSidebar && onToggleSidebar && (
               <button
                 onClick={onToggleSidebar}
@@ -220,23 +243,26 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
                 <PanelLeft className="w-5 h-5" />
               </button>
             )}
-            <Link href="/overview" className="flex items-center gap-3 group">
-              <div className="relative w-10 h-10 flex items-center justify-center bg-[#020617] rounded-lg border border-blue-900/50 p-1 group-hover:border-cyan-500/50 transition-colors">
+            <Link href="/overview" className="flex items-center gap-2 group shrink-0">
+              <div className="relative w-8 h-8 flex items-center justify-center bg-[#020617] rounded-lg border border-blue-900/50 p-0.5 group-hover:border-cyan-500/50 transition-colors">
                 <img src="/img/please-protect.svg" alt="PLEASE-PROTECT Logo" className="w-full h-full object-contain" />
               </div>
-              <span className="text-2xl font-bold tracking-tight text-white hidden sm:block uppercase">PLEASE-PROTECT <span className="text-cyan-400">CENTER</span></span>
+              <span className="text-2xl font-bold tracking-tight text-white hidden sm:block uppercase whitespace-nowrap">PLEASE-PROTECT <span className="text-cyan-400">CENTER</span></span>
             </Link>
           </div>
 
           {/* Desktop Menu Center */}
-          <div className="hidden md:flex items-center gap-1 ml-6 flex-1">
+          <div className="hidden md:flex items-center gap-1 ml-6 flex-1 mr-6 lg:mr-10">
             {navItems.map((item) => (
               <div key={item.label} className="relative" ref={(el) => { if (el) dropdownRefs.current[item.label] = el; }}>
                 <button
                   onClick={() => setActiveDropdown(activeDropdown === item.label ? null : item.label)}
-                  className={`flex items-center gap-1 px-4 py-2 text-base font-medium transition-all duration-200 rounded-md ${isParentActive(item) ? "text-cyan-400 bg-blue-500/10" : "text-slate-400 hover:bg-blue-900/20"}`}
+                  className={cn(
+                    "flex items-center gap-1 px-4 py-2 text-base font-medium whitespace-nowrap transition-all duration-200 rounded-md",
+                    isParentActive(item) ? "text-cyan-400 bg-blue-500/10" : "text-slate-400 hover:bg-blue-900/20"
+                  )}
                 >
-                  {item.label} <ChevronDown className={`w-4 h-4 mt-0.5 opacity-70 transition-transform ${activeDropdown === item.label ? "rotate-180" : ""}`} />
+                  {item.label} <ChevronDown className={cn("w-4 h-4 mt-0.5 opacity-70 transition-transform", activeDropdown === item.label ? "rotate-180" : "")} />
                 </button>
                 {activeDropdown === item.label && (
                   <div className="absolute left-0 top-full mt-2 min-w-[220px] p-1 bg-[#0B1120] border border-blue-900/30 shadow-xl rounded-lg animate-in fade-in slide-in-from-top-2">
@@ -245,7 +271,10 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
                         key={subItem.label || idx}
                         href={subItem.href!}
                         onClick={() => setActiveDropdown(null)}
-                        className={`flex items-center px-3 py-3 text-base rounded-md transition-colors w-full ${pathname === subItem.href ? "bg-blue-500/20 text-cyan-400 font-medium" : "text-slate-400 hover:bg-blue-900/30"}`}
+                        className={cn(
+                          "flex items-center px-3 py-3 text-base rounded-md transition-colors w-full whitespace-nowrap",
+                          pathname === subItem.href ? "bg-blue-500/20 text-cyan-400 font-medium" : "text-slate-400 hover:bg-blue-900/30"
+                        )}
                       >
                         {subItem.icon} {subItem.label}
                       </Link>
@@ -257,7 +286,7 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
           </div>
 
           {/* Right Actions */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             
             {/* Desktop Organization Selector */}
             <div className="relative hidden lg:block" ref={orgDropdownRef}>
@@ -267,7 +296,7 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
               >
                 <Building2 className="w-4 h-4 text-cyan-500" />
                 <span className="font-semibold text-white text-sm max-w-[120px] truncate">{selectedOrg ? selectedOrg.name : "Loading..."}</span>
-                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isOrgOpen ? "rotate-180" : ""}`} />
+                <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform", isOrgOpen ? "rotate-180" : "")} />
               </button>
               {isOrgOpen && (
                 <div className="absolute right-0 top-full mt-2 w-64 bg-[#0B1120] border border-blue-900/50 rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2">
@@ -288,7 +317,10 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
                       <button
                         key={`${org.id}-${index}`}
                         onClick={() => handleOrgChange(org)}
-                        className={`w-full text-left px-3 py-2.5 rounded-lg text-sm mb-1 flex justify-between items-center transition-colors ${selectedOrg?.id === org.id ? "bg-blue-600/20 text-cyan-400 font-semibold" : "text-slate-300 hover:bg-[#162032]"}`}
+                        className={cn(
+                          "w-full text-left px-3 py-2.5 rounded-lg text-sm mb-1 flex justify-between items-center transition-colors",
+                          selectedOrg?.id === org.id ? "bg-blue-600/20 text-cyan-400 font-semibold" : "text-slate-300 hover:bg-[#162032]"
+                        )}
                       >
                         {org.name}
                         {selectedOrg?.id === org.id && <Check className="w-4 h-4 text-cyan-400" />}
@@ -311,14 +343,14 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
               >
                 <Globe className="w-3.5 h-3.5" />
                 <span>{language}</span>
-                <ChevronDown className={`w-3 h-3 opacity-50 transition-transform ${isLangDropdownOpen ? "rotate-180" : ""}`} />
+                <ChevronDown className={cn("w-3 h-3 opacity-50 transition-transform", isLangDropdownOpen ? "rotate-180" : "")} />
               </button>
               {isLangDropdownOpen && (
                 <div className="absolute right-0 top-full mt-2 w-[150px] p-1 bg-[#0B1120] border border-blue-900/30 shadow-xl rounded-lg text-blue-100 animate-in fade-in slide-in-from-top-2">
-                  <button onClick={() => { setLanguage("EN"); setIsLangDropdownOpen(false); }} className={`w-full flex items-center justify-between px-3 py-2 rounded-md transition-colors text-sm ${language === "EN" ? "bg-blue-500/20 text-cyan-400" : "hover:bg-blue-900/30 text-slate-400"}`}>
+                  <button onClick={() => { setLanguage("EN"); setIsLangDropdownOpen(false); }} className={cn("w-full flex items-center justify-between px-3 py-2 rounded-md transition-colors text-sm", language === "EN" ? "bg-blue-500/20 text-cyan-400" : "hover:bg-blue-900/30 text-slate-400")}>
                     <div className="flex gap-2"><span>🇬🇧</span> English</div>{language === "EN" && <Check className="w-3.5 h-3.5" />}
                   </button>
-                  <button onClick={() => { setLanguage("TH"); setIsLangDropdownOpen(false); }} className={`w-full flex items-center justify-between px-3 py-2 rounded-md transition-colors text-sm mt-1 ${language === "TH" ? "bg-blue-500/20 text-cyan-400" : "hover:bg-blue-900/30 text-slate-400"}`}>
+                  <button onClick={() => { setLanguage("TH"); setIsLangDropdownOpen(false); }} className={cn("w-full flex items-center justify-between px-3 py-2 rounded-md transition-colors text-sm mt-1", language === "TH" ? "bg-blue-500/20 text-cyan-400" : "hover:bg-blue-900/30 text-slate-400")}>
                     <div className="flex gap-2"><span>🇹🇭</span> ภาษาไทย</div>{language === "TH" && <Check className="w-3.5 h-3.5" />}
                   </button>
                 </div>
@@ -388,7 +420,7 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
                   <Building2 className="w-4 h-4 text-cyan-500 flex-shrink-0" />
                   <span className="truncate font-medium">{selectedOrg ? selectedOrg.name : "Loading..."}</span>
                 </div>
-                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isMobileOrgOpen ? "rotate-180" : ""}`} />
+                <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform", isMobileOrgOpen ? "rotate-180" : "")} />
               </button>
               
               {isMobileOrgOpen && (
@@ -407,7 +439,10 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
                       <button
                         key={`mob-org-${org.id}-${index}`}
                         onClick={() => handleOrgChange(org)}
-                        className={`w-full text-left px-4 py-3 text-sm flex justify-between items-center border-b border-blue-900/10 last:border-0 ${selectedOrg?.id === org.id ? "text-cyan-400 bg-blue-900/20" : "text-slate-300"}`}
+                        className={cn(
+                          "w-full text-left px-4 py-3 text-sm flex justify-between items-center border-b border-blue-900/10 last:border-0",
+                          selectedOrg?.id === org.id ? "text-cyan-400 bg-blue-900/20" : "text-slate-300"
+                        )}
                       >
                         {org.name}
                         {selectedOrg?.id === org.id && <Check className="w-4 h-4 text-cyan-400" />}
@@ -451,13 +486,19 @@ export function Navbar({ hasSidebar, onToggleSidebar }: NavbarProps) {
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => { setLanguage("EN"); setIsMobileMenuOpen(false); }}
-                  className={`flex justify-center items-center gap-2 py-3 text-sm font-medium rounded-md border ${language === "EN" ? "bg-[#0B1120] border-cyan-500 text-cyan-400" : "bg-[#0B1120] border-blue-900/30 text-slate-400"}`}
+                  className={cn(
+                    "flex justify-center items-center gap-2 py-3 text-sm font-medium rounded-md border",
+                    language === "EN" ? "bg-[#0B1120] border-cyan-500 text-cyan-400" : "bg-[#0B1120] border-blue-900/30 text-slate-400"
+                  )}
                 >
                   🇬🇧 English
                 </button>
                 <button
                   onClick={() => { setLanguage("TH"); setIsMobileMenuOpen(false); }}
-                  className={`flex justify-center items-center gap-2 py-3 text-sm font-medium rounded-md border ${language === "TH" ? "bg-[#0B1120] border-cyan-500 text-cyan-400" : "bg-[#0B1120] border-blue-900/30 text-slate-400"}`}
+                  className={cn(
+                    "flex justify-center items-center gap-2 py-3 text-sm font-medium rounded-md border",
+                    language === "TH" ? "bg-[#0B1120] border-cyan-500 text-cyan-400" : "bg-[#0B1120] border-blue-900/30 text-slate-400"
+                  )}
                 >
                   🇹🇭 ไทย
                 </button>

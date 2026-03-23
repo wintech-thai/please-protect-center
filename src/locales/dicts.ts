@@ -1552,6 +1552,7 @@ export const translations = {
     EN: {
       title: "Audit Logs",
       subtitle: "Monitor user activities and system events.",
+      totalLogs: "Total Logs",
       searchPlaceholder: "Search Value",
       columns: {
         time: "Time",
@@ -1597,6 +1598,7 @@ export const translations = {
     TH: {
       title: "บันทึกการตรวจสอบ",
       subtitle: "ตรวจสอบกิจกรรมผู้ใช้และเหตุการณ์ในระบบ",
+      totalLogs: "รวมทั้งหมด",
       searchPlaceholder: "ค้นหาข้อมูล",
       columns: {
         time: "เวลา",
