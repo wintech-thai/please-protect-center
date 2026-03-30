@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, use, useMemo } from "react";
-import { Activity, Cpu, HardDrive, Wifi, Clock, Server, Eye, X, FileJson, Check, Copy, ChevronLeft, ChevronRight } from "lucide-react";
+import { Activity, Cpu, HardDrive, Wifi, Clock, Server, Eye, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { format, subMinutes, subHours, subDays } from "date-fns";
 import { 
   AdvancedTimeRangeSelector, 
@@ -10,6 +10,7 @@ import {
 import { Navbar } from "@/src/components/layout/navbar"; 
 import { sensorStatsApi } from "@/src/modules/fleet/api/sensor-stats.api";
 import { SensorOverviewHistogram } from "@/src/components/ui/sensor-overview-histogram";
+import { SensorDetailFlyout } from "@/src/components/ui/sensor-detail-flyout";
 
 export default function SensorOverviewPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -39,8 +40,8 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
   });
 
   const [selectedLog, setSelectedLog] = useState<any | null>(null);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [isCopied, setIsCopied] = useState(false);
+  const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
+  const [showFlyout, setShowFlyout] = useState(false);
 
   const fetchOverviewData = useCallback(async () => {
     if (!sensorId) return;
@@ -86,7 +87,6 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
       setChartInterval(interval);
       setPage(1);
 
-      // Helper
       const getField = (source: any, nestedPath: string, flatKey: string) => {
           const parts = nestedPath.split('.');
           let nestedVal = source;
@@ -94,7 +94,6 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
           return (nestedVal !== undefined && nestedVal !== source) ? nestedVal : source[flatKey];
       };
 
-      // Set ตาราง Logs
       const mappedLogs = hits.map((h: any) => {
         const source = h._source || {};
         return {
@@ -130,7 +129,7 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
             diskUsedGb = sumArray(latestSource['data.disk.used_gb'] || latestSource.data?.disk?.used_gb || 0);
             diskTotalGb = sumArray(latestSource['data.disk.total_gb'] || latestSource.data?.disk?.total_gb || 0);
         }
-        if (diskTotalGb === 0) diskTotalGb = 1; // ป้องกันหารด้วย 0
+        if (diskTotalGb === 0) diskTotalGb = 1; 
 
         let netRxBytes = 0;
         let netTxBytes = 0;
@@ -184,30 +183,15 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
     return logs.slice(start, start + itemsPerPage);
   }, [logs, page, itemsPerPage]);
 
-  const highlightJson = (json: object) => {
-    const jsonString = JSON.stringify(json, null, 2);
-    return jsonString.replace(
-      /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
-      (match) => {
-        let cls = 'text-[#ce9178]';
-        if (/^"/.test(match)) {
-          if (/:$/.test(match)) cls = 'text-[#9cdcfe]';
-        } else if (/true|false|null/.test(match)) {
-          cls = 'text-[#569cd6]';
-        } else {
-          cls = 'text-[#b5cea8]';
-        }
-        return `<span class="${cls}">${match}</span>`;
-      }
-    );
+  const handleRowClick = (id: string) => {
+    setSelectedRowId(id);
   };
 
-  const handleCopyJson = () => {
-    if (selectedLog) {
-        navigator.clipboard.writeText(JSON.stringify(selectedLog.rawDoc, null, 2));
-        setIsCopied(true);
-        setTimeout(() => setIsCopied(false), 2000);
-    }
+  const handleOpenFlyout = (log: any, index: number) => {
+    const globalIndex = (page - 1) * itemsPerPage + index;
+    setSelectedRowId(log.id);
+    setSelectedLog({ ...log.rawDoc, __index: globalIndex });
+    setShowFlyout(true);
   };
 
   return (
@@ -216,12 +200,19 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
 
       <main className="flex-1 overflow-y-auto space-y-6 animate-in fade-in duration-500 custom-scrollbar relative">
         
-        {/* Header & Time Control */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#0B1120] p-5 rounded-xl border border-blue-900/30 shadow-lg">
           <div>
             <h1 className="text-2xl font-bold text-white flex items-center gap-3">
               <Server className="w-6 h-6 text-cyan-400" />
               Sensor Overview: <span className="text-cyan-400">{sensorId || "Unknown"}</span>
+              <button 
+                onClick={fetchOverviewData} 
+                disabled={isLoading}
+                className="p-1.5 ml-2 rounded-lg bg-blue-900/30 hover:bg-blue-600/50 text-cyan-400 transition-colors border border-blue-900/50 group"
+                title="Refresh data"
+              >
+                <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin opacity-50' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
+              </button>
             </h1>
             <div className="flex items-center gap-2 mt-2">
               <span className="relative flex h-3 w-3">
@@ -244,7 +235,6 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
           </div>
         </div>
 
-        {/* (Stats Cards) */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-[#0B1120] border border-blue-900/30 rounded-xl p-5 shadow-lg relative overflow-hidden">
             <div className="flex justify-between items-start mb-4">
@@ -296,7 +286,6 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
           </div>
         </div>
 
-        {/* (Graph + Table) */}
         <div className="bg-[#0B1120] border border-blue-900/30 rounded-xl shadow-lg flex flex-col overflow-hidden">
           <div className="p-5 border-b border-blue-900/30">
             <h3 className="text-lg font-bold text-white">Connection History</h3>
@@ -329,28 +318,44 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
                 ) : currentLogs.length === 0 ? (
                   <tr><td colSpan={5} className="p-10 text-center text-slate-500">No connection logs found for this time range.</td></tr>
                 ) : (
-                  currentLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-blue-900/10 transition-colors text-[13px] group">
-                      <td className="p-4 text-slate-300 font-mono">{format(new Date(log.timestamp), "M/d/yyyy, h:mm:ss a")}</td>
-                      <td className="p-4 font-bold text-emerald-400">{log.status}</td>
-                      <td className="p-4 text-slate-300">{log.ip}</td>
-                      <td className="p-4 text-slate-400 font-mono text-[11px]">{log.logType}</td>
-                      <td className="p-4 text-center">
-                        <button 
-                          onClick={() => { setSelectedLog(log); setShowDetailModal(true); setIsCopied(false); }}
-                          className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
-                        >
-                            <Eye className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  currentLogs.map((log, index) => {
+                    const isSelected = selectedRowId === log.id;
+
+                    return (
+                      <tr 
+                        key={log.id} 
+                        onClick={() => handleRowClick(log.id)}
+                        className={`transition-all duration-300 group text-[13px] cursor-pointer 
+                          ${isSelected ? "bg-blue-900/20 border-l-4 border-l-cyan-400" : "hover:bg-blue-900/10 border-l-4 border-l-transparent"}
+                        `}
+                      >
+                        <td className={`p-4 font-mono ${isSelected ? 'text-slate-200' : 'text-slate-300'}`}>
+                          {format(new Date(log.timestamp), "M/d/yyyy, h:mm:ss a")}
+                        </td>
+                        <td className="p-4 font-bold text-emerald-400">{log.status}</td>
+                        <td className={`p-4 ${isSelected ? 'text-slate-200' : 'text-slate-300'}`}>{log.ip}</td>
+                        <td className={`p-4 font-mono text-[11px] ${isSelected ? 'text-slate-300' : 'text-slate-400'}`}>{log.logType}</td>
+                        <td className="p-4 text-center">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation(); 
+                              handleOpenFlyout(log, index);
+                            }}
+                            className={`p-1.5 rounded-full transition-colors border border-transparent outline-none
+                              ${isSelected ? 'text-white bg-slate-800' : 'text-slate-400 hover:text-white hover:bg-slate-800'}
+                            `}
+                          >
+                              <Eye className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
           </div>
 
-          {/* 🚀 4. Footer Pagination */}
           <div className="flex-none flex items-center justify-between sm:justify-end px-6 py-4 border-t border-blue-900/50 bg-[#020617] z-20 gap-6">
               <div className="flex items-center gap-2 text-sm text-slate-400">
                   <span>Rows per page</span> 
@@ -390,33 +395,23 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
 
       </main>
 
-      {/* JSON Detail Modal */}
-      {showDetailModal && selectedLog && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-200 p-4">
-            <div className="bg-[#0B1120] border border-blue-900/50 rounded-xl shadow-2xl w-full max-w-3xl flex flex-col h-[85vh] transform scale-100 animate-in zoom-in-95 duration-200">
-                <div className="flex items-center justify-between p-5 border-b border-blue-900/30 flex-none bg-[#020617]">
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                        <FileJson className="w-5 h-5 text-cyan-400" /> RAW JSON DATA
-                    </h3>
-                    <button onClick={() => setShowDetailModal(false)} className="text-slate-400 hover:text-white transition-colors p-1 hover:bg-slate-800 rounded"><X className="w-5 h-5" /></button>
-                </div>
-
-                <div className="flex-1 overflow-auto p-4 bg-[#0d1117] no-scrollbar">
-                    <pre
-                      className="text-xs font-mono leading-relaxed whitespace-pre-wrap break-all select-text"
-                      dangerouslySetInnerHTML={{ __html: highlightJson(selectedLog.rawDoc) }}
-                    />
-                </div>
-
-                <div className="p-4 border-t border-blue-900/30 bg-[#020617] flex justify-between items-center flex-none">
-                    <button onClick={handleCopyJson} className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-colors">
-                        {isCopied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                        {isCopied ? "Copied!" : "Copy JSON"}
-                    </button>
-                    <button onClick={() => setShowDetailModal(false)} className="px-4 py-2 text-sm font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg transition-colors border border-slate-700">Close</button>
-                </div>
-            </div>
-        </div>
+      {showFlyout && selectedLog && (
+        <SensorDetailFlyout
+          log={selectedLog}
+          logs={logs.map(l => l.rawDoc)}
+          currentIndex={selectedLog.__index}
+          onNavigate={(idx) => {
+             const newLog = logs[idx];
+             if (newLog) {
+               setSelectedLog({ ...newLog.rawDoc, __index: idx });
+               setSelectedRowId(newLog.id); 
+             }
+          }}
+          onClose={() => {
+            setShowFlyout(false);
+            setSelectedLog(null);
+          }}
+        />
       )}
 
     </div>
