@@ -12,6 +12,27 @@ import { sensorStatsApi } from "@/src/modules/fleet/api/sensor-stats.api";
 import { SensorOverviewHistogram } from "@/src/components/ui/sensor-overview-histogram";
 import { SensorDetailFlyout } from "@/src/components/ui/sensor-detail-flyout";
 
+interface DiskStat {
+  name: string;
+  used: number;
+  total: number;
+  percent: number;
+}
+
+interface NetworkStat {
+  name: string;
+  rx: number;
+  tx: number;
+}
+
+interface SystemStats {
+  cpu: number;
+  memory: { used: number; total: number; percent: number };
+  disks: DiskStat[];
+  networks: NetworkStat[];
+  lastSeen: string;
+}
+
 export default function SensorOverviewPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const sensorId = resolvedParams.id; 
@@ -31,11 +52,11 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
   const [page, setPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
 
-  const [latestStats, setLatestStats] = useState({
+  const [latestStats, setLatestStats] = useState<SystemStats>({
     cpu: 0,
-    memory: { used: 0, total: 1 }, 
-    disk: { used: 0, total: 1 },  
-    network: { rx: 0, tx: 0 },    
+    memory: { used: 0, total: 1, percent: 0 }, 
+    disks: [],  
+    networks: [],    
     lastSeen: new Date().toISOString()
   });
 
@@ -114,50 +135,68 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
         const cpuPercent = getField(latestSource, 'data.cpu.usage_percent', 'data.cpu.usage_percent') || 0;
         const memUsedMb = getField(latestSource, 'data.memory.used_mb', 'data.memory.used_mb') || 0;
         const memTotalMb = getField(latestSource, 'data.memory.total_mb', 'data.memory.total_mb') || 1;
+        
+        const memUsedGb = Number((memUsedMb / 1024).toFixed(1));
+        const memTotalGb = Number((memTotalMb / 1024).toFixed(1));
+        const memPercent = memTotalGb > 0 ? (memUsedGb / memTotalGb) * 100 : 0;
 
         const sumArray = (val: any) => Array.isArray(val) ? val.reduce((a, b) => a + (Number(b) || 0), 0) : (Number(val) || 0);
 
-        let diskUsedGb = 0;
-        let diskTotalGb = 0;
-        
+        const disks: DiskStat[] = [];
         if (latestSource.data?.disk && Array.isArray(latestSource.data.disk)) {
-            latestSource.data.disk.forEach((d: any) => {
-                diskUsedGb += Number(d.used_gb) || 0;
-                diskTotalGb += Number(d.total_gb) || 0;
+            latestSource.data.disk.forEach((d: any, idx: number) => {
+                const used = Number(d.used_gb) || 0;
+                const total = Number(d.total_gb) || 1;
+                disks.push({
+                    name: d.device || d.mount_point || d.device_name || `Disk ${idx + 1}`,
+                    used: Number(used.toFixed(1)),
+                    total: Number(total.toFixed(1)),
+                    percent: (used / total) * 100
+                });
             });
         } else {
-            diskUsedGb = sumArray(latestSource['data.disk.used_gb'] || latestSource.data?.disk?.used_gb || 0);
-            diskTotalGb = sumArray(latestSource['data.disk.total_gb'] || latestSource.data?.disk?.total_gb || 0);
+            const usedRaw = sumArray(latestSource['data.disk.used_gb'] || latestSource.data?.disk?.used_gb || 0);
+            const totalRaw = sumArray(latestSource['data.disk.total_gb'] || latestSource.data?.disk?.total_gb || 0);
+            if (totalRaw > 0) {
+                disks.push({
+                    name: "Total Disk",
+                    used: Number(usedRaw.toFixed(1)),
+                    total: Number(totalRaw.toFixed(1)),
+                    percent: (usedRaw / totalRaw) * 100
+                });
+            }
         }
-        if (diskTotalGb === 0) diskTotalGb = 1; 
 
-        let netRxBytes = 0;
-        let netTxBytes = 0;
-
+        const networks: NetworkStat[] = [];
         if (latestSource.data?.interfaces?.interfaces && Array.isArray(latestSource.data.interfaces.interfaces)) {
-            latestSource.data.interfaces.interfaces.forEach((iface: any) => {
-                netRxBytes += Number(iface.stats?.rx_bytes) || 0;
-                netTxBytes += Number(iface.stats?.tx_bytes) || 0;
+            latestSource.data.interfaces.interfaces.forEach((iface: any, idx: number) => {
+                networks.push({
+                    name: iface.name || `Interface ${idx + 1}`,
+                    rx: Number(((Number(iface.stats?.rx_bytes) || 0) / (1024 * 1024)).toFixed(2)),
+                    tx: Number(((Number(iface.stats?.tx_bytes) || 0) / (1024 * 1024)).toFixed(2))
+                });
             });
         } else {
-            netRxBytes = sumArray(latestSource['data.interfaces.interfaces.stats.rx_bytes'] || latestSource.data?.interfaces?.interfaces?.stats?.rx_bytes || 0);
-            netTxBytes = sumArray(latestSource['data.interfaces.interfaces.stats.tx_bytes'] || latestSource.data?.interfaces?.interfaces?.stats?.tx_bytes || 0);
+             const rxRaw = sumArray(latestSource['data.interfaces.interfaces.stats.rx_bytes'] || latestSource.data?.interfaces?.interfaces?.stats?.rx_bytes || 0);
+             const txRaw = sumArray(latestSource['data.interfaces.interfaces.stats.tx_bytes'] || latestSource.data?.interfaces?.interfaces?.stats?.tx_bytes || 0);
+             if (rxRaw > 0 || txRaw > 0) {
+                 networks.push({
+                     name: "Total Traffic",
+                     rx: Number((rxRaw / (1024 * 1024)).toFixed(2)),
+                     tx: Number((txRaw / (1024 * 1024)).toFixed(2))
+                 });
+             }
         }
 
         setLatestStats({
           cpu: Number(cpuPercent),
           memory: { 
-            used: Number((memUsedMb / 1024).toFixed(1)), 
-            total: Number((memTotalMb / 1024).toFixed(1)) 
+            used: memUsedGb, 
+            total: memTotalGb,
+            percent: memPercent
           },
-          disk: { 
-            used: Number(diskUsedGb.toFixed(1)), 
-            total: Number(diskTotalGb.toFixed(1)) 
-          },
-          network: { 
-            rx: Number((netRxBytes / (1024 * 1024)).toFixed(2)), 
-            tx: Number((netTxBytes / (1024 * 1024)).toFixed(2)) 
-          },
+          disks,
+          networks,
           lastSeen: getField(latestSource, 'data.timestamp', 'data.timestamp') || latestSource['@timestamp']
         });
       }
@@ -236,54 +275,90 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-[#0B1120] border border-blue-900/30 rounded-xl p-5 shadow-lg relative overflow-hidden">
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-2 bg-blue-500/10 rounded-lg"><Cpu className="w-5 h-5 text-blue-400" /></div>
-              <span className="text-2xl font-bold font-mono text-white">{latestStats.cpu.toFixed(2)}%</span>
+          
+          <div className="bg-[#0B1120] border border-blue-900/30 rounded-xl p-5 shadow-lg flex flex-col justify-between h-[150px]">
+            <div className="flex justify-between items-start">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-500/10 rounded-lg"><Cpu className="w-5 h-5 text-blue-400" /></div>
+                <h3 className="text-sm font-bold text-white">CPU Usage</h3>
+              </div>
+              <span className="text-2xl font-bold font-mono text-white">{latestStats.cpu.toFixed(1)}%</span>
             </div>
-            <h3 className="text-sm text-slate-400 font-medium mb-2">CPU Usage</h3>
-            <div className="w-full bg-slate-800 rounded-full h-1.5 mb-1">
-              <div className={`h-1.5 rounded-full ${latestStats.cpu > 80 ? 'bg-red-500' : 'bg-blue-500'} transition-all duration-1000`} style={{ width: `${Math.min(latestStats.cpu, 100)}%` }}></div>
-            </div>
-          </div>
-
-          <div className="bg-[#0B1120] border border-blue-900/30 rounded-xl p-5 shadow-lg relative overflow-hidden">
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-2 bg-purple-500/10 rounded-lg"><Activity className="w-5 h-5 text-purple-400" /></div>
-              <span className="text-2xl font-bold font-mono text-white">
-                {((latestStats.memory.used / latestStats.memory.total) * 100).toFixed(1)}%
-              </span>
-            </div>
-            <h3 className="text-sm text-slate-400 font-medium mb-2">Memory Usage ({latestStats.memory.used} / {latestStats.memory.total} GB)</h3>
-            <div className="w-full bg-slate-800 rounded-full h-1.5 mb-1">
-              <div className="h-1.5 rounded-full bg-purple-500 transition-all duration-1000" style={{ width: `${(latestStats.memory.used / latestStats.memory.total) * 100}%` }}></div>
+            <div className="mt-4">
+              <div className="w-full bg-slate-800 rounded-full h-1.5 mb-1">
+                <div className={`h-1.5 rounded-full ${latestStats.cpu > 80 ? 'bg-red-500' : 'bg-blue-500'} transition-all duration-1000`} style={{ width: `${Math.min(latestStats.cpu, 100)}%` }}></div>
+              </div>
+              <div className="text-[10px] text-slate-500 text-right mt-1">Overall System CPU</div>
             </div>
           </div>
 
-          <div className="bg-[#0B1120] border border-blue-900/30 rounded-xl p-5 shadow-lg relative overflow-hidden">
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-2 bg-amber-500/10 rounded-lg"><HardDrive className="w-5 h-5 text-amber-400" /></div>
-              <span className="text-2xl font-bold font-mono text-white">
-                {((latestStats.disk.used / latestStats.disk.total) * 100).toFixed(1)}%
-              </span>
+          <div className="bg-[#0B1120] border border-blue-900/30 rounded-xl p-5 shadow-lg flex flex-col justify-between h-[150px]">
+            <div className="flex justify-between items-start">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-500/10 rounded-lg"><Activity className="w-5 h-5 text-purple-400" /></div>
+                <h3 className="text-sm font-bold text-white">Memory</h3>
+              </div>
+              <span className="text-2xl font-bold font-mono text-white">{latestStats.memory.percent.toFixed(1)}%</span>
             </div>
-            <h3 className="text-sm text-slate-400 font-medium mb-2">Disk Usage ({latestStats.disk.used} / {latestStats.disk.total} GB)</h3>
-            <div className="w-full bg-slate-800 rounded-full h-1.5 mb-1">
-              <div className="h-1.5 rounded-full bg-amber-500 transition-all duration-1000" style={{ width: `${(latestStats.disk.used / latestStats.disk.total) * 100}%` }}></div>
-            </div>
-          </div>
-
-          <div className="bg-[#0B1120] border border-blue-900/30 rounded-xl p-5 shadow-lg relative overflow-hidden">
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-2 bg-emerald-500/10 rounded-lg"><Wifi className="w-5 h-5 text-emerald-400" /></div>
-              <div className="flex flex-col items-end">
-                 <span className="text-sm font-bold font-mono text-emerald-400 flex items-center gap-1">↓ {latestStats.network.rx} MB</span>
-                 <span className="text-sm font-bold font-mono text-blue-400 flex items-center gap-1">↑ {latestStats.network.tx} MB</span>
+            <div className="mt-4">
+              <div className="flex justify-between items-end mb-1">
+                 <span className="text-[10px] text-slate-400">Used Space</span>
+                 <span className="text-[10px] text-slate-400 font-mono">{latestStats.memory.used} / {latestStats.memory.total} GB</span>
+              </div>
+              <div className="w-full bg-slate-800 rounded-full h-1.5 mb-1">
+                <div className="h-1.5 rounded-full bg-purple-500 transition-all duration-1000" style={{ width: `${Math.min(latestStats.memory.percent, 100)}%` }}></div>
               </div>
             </div>
-            <h3 className="text-sm text-slate-400 font-medium mb-2">Network (Total Traffic)</h3>
-            <div className="text-xs text-slate-500">Cumulative interface usage</div>
           </div>
+
+          <div className="bg-[#0B1120] border border-blue-900/30 rounded-xl p-5 shadow-lg flex flex-col h-[150px]">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 bg-amber-500/10 rounded-lg"><HardDrive className="w-5 h-5 text-amber-400" /></div>
+              <h3 className="text-sm font-bold text-white">Disk Usage</h3>
+            </div>
+            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
+              {latestStats.disks.length > 0 ? (
+                latestStats.disks.map((disk, idx) => (
+                  <div key={idx} className="flex flex-col gap-1">
+                    <div className="flex justify-between items-end">
+                      <span className="text-xs font-medium text-slate-300 truncate max-w-[80px]" title={disk.name}>{disk.name}</span>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {disk.used} / {disk.total} GB <span className="text-amber-400 font-bold ml-1">{disk.percent.toFixed(1)}%</span>
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-800 rounded-full h-1.5">
+                      <div className={`h-1.5 rounded-full ${disk.percent > 80 ? 'bg-red-500' : 'bg-amber-500'} transition-all duration-1000`} style={{ width: `${Math.min(disk.percent, 100)}%` }}></div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-xs text-slate-500 flex h-full items-center justify-center">No disk data</div>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-[#0B1120] border border-blue-900/30 rounded-xl p-5 shadow-lg flex flex-col h-[150px]">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 bg-emerald-500/10 rounded-lg"><Wifi className="w-5 h-5 text-emerald-400" /></div>
+              <h3 className="text-sm font-bold text-white">Network Traffic</h3>
+            </div>
+            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-2">
+              {latestStats.networks.length > 0 ? (
+                latestStats.networks.map((net, idx) => (
+                  <div key={idx} className="flex justify-between items-center bg-slate-800/30 rounded p-1.5 border border-slate-700/50">
+                    <span className="text-xs font-medium text-slate-300 truncate max-w-[80px]" title={net.name}>{net.name}</span>
+                    <div className="flex flex-col items-end text-[10px] font-mono leading-tight">
+                      <span className="text-emerald-400">↓ {net.rx} MB</span>
+                      <span className="text-blue-400">↑ {net.tx} MB</span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-xs text-slate-500 flex h-full items-center justify-center">No interface data</div>
+              )}
+            </div>
+          </div>
+
         </div>
 
         <div className="bg-[#0B1120] border border-blue-900/30 rounded-xl shadow-lg flex flex-col overflow-hidden">
@@ -338,7 +413,7 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
                         <td className="p-4 text-center">
                           <button 
                             onClick={(e) => {
-                              e.stopPropagation(); 
+                              e.stopPropagation();
                               handleOpenFlyout(log, index);
                             }}
                             className={`p-1.5 rounded-full transition-colors border border-transparent outline-none
@@ -404,12 +479,13 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
              const newLog = logs[idx];
              if (newLog) {
                setSelectedLog({ ...newLog.rawDoc, __index: idx });
-               setSelectedRowId(newLog.id); 
+               setSelectedRowId(newLog.id);
              }
           }}
           onClose={() => {
             setShowFlyout(false);
             setSelectedLog(null);
+            setSelectedRowId(null);
           }}
         />
       )}
