@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams, usePathname } from "next/navigation";
+import { useSearchParams, usePathname, useRouter } from "next/navigation";
 import { 
   Search, 
   ChevronLeft, 
@@ -36,6 +36,7 @@ export interface SensorItem {
 }
 
 export default function SensorPage() {
+  const router = useRouter();
   const pathname = usePathname(); 
   const searchParams = useSearchParams();
   const highlightIdParam = searchParams.get("highlight");
@@ -245,7 +246,13 @@ export default function SensorPage() {
                                                   </button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" className="bg-[#0B1120] border border-blue-900/50 text-slate-200 min-w-[160px] p-1 shadow-2xl z-[100]">
-                                                  <DropdownMenuItem onClick={() => {}} className="cursor-pointer focus:bg-white/5 focus:text-blue-400 text-slate-300 px-3 py-2 text-sm rounded-md outline-none flex items-center gap-2 border-t border-blue-900/20">
+                                                  <DropdownMenuItem 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        router.push(`/fleet/sensor/${rowId}/overview`);
+                                                    }} 
+                                                    className="cursor-pointer focus:bg-white/5 focus:text-blue-400 text-slate-300 px-3 py-2 text-sm rounded-md outline-none flex items-center gap-2 border-t border-blue-900/20"
+                                                  >
                                                     <BarChart2 className="w-4 h-4" /> Overview
                                                   </DropdownMenuItem>
                                                 </DropdownMenuContent>

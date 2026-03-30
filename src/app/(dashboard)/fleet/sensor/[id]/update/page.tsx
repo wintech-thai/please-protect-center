@@ -15,7 +15,6 @@ export default function UpdateSensorPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const sensorId = params?.id as string;
-  
   const { language } = useLanguage();
   const t = agentTranslations.updateSensor[language];
   
