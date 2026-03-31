@@ -196,5 +196,97 @@ export const agentTranslations = {
         updateError: "เกิดข้อผิดพลาดในการอัปเดตเซนเซอร์"
       }
     }
+  },
+
+  sensorOverview: {
+    EN: {
+      title: "Sensor Overview",
+      unknown: "Unknown",
+      refreshTooltip: "Refresh data",
+      lastSeen: "Last seen:",
+      back: "Back",
+      cards: {
+        cpuUsage: "CPU Usage",
+        overallCpu: "Overall System CPU",
+        memory: "Memory",
+        usedSpace: "Used Space",
+        diskUsage: "Disk Usage",
+        noDiskData: "No disk data",
+        networkTraffic: "Network Traffic",
+        noInterfaceData: "No interface data"
+      },
+      history: {
+        title: "Connection History",
+        loadingGraph: "Loading graph data...",
+        fetchingLogs: "Fetching connection logs...",
+        noLogs: "No connection logs found for this time range."
+      },
+      table: {
+        timestamp: "Timestamp",
+        status: "Status",
+        ipAddress: "IP Address",
+        logType: "Log Type",
+        actions: "Actions",
+        rowsPerPage: "Rows per page",
+        of: "of"
+      }
+    },
+    TH: {
+      title: "ภาพรวมเซนเซอร์",
+      unknown: "ไม่ทราบชื่อ",
+      back: "ย้อนกลับ",
+      refreshTooltip: "รีเฟรชข้อมูล",
+      lastSeen: "ใช้งานล่าสุดเมื่อ:",
+      cards: {
+        cpuUsage: "การใช้ CPU",
+        overallCpu: "การใช้ CPU ของระบบโดยรวม",
+        memory: "หน่วยความจำ (Memory)",
+        usedSpace: "พื้นที่ที่ใช้ไป",
+        diskUsage: "การใช้ดิสก์",
+        noDiskData: "ไม่มีข้อมูลดิสก์",
+        networkTraffic: "ปริมาณการรับส่งข้อมูลเครือข่าย",
+        noInterfaceData: "ไม่มีข้อมูลเครือข่าย"
+      },
+      history: {
+        title: "ประวัติการเชื่อมต่อ",
+        loadingGraph: "กำลังโหลดข้อมูลกราฟ...",
+        fetchingLogs: "กำลังดึงข้อมูลล็อกการเชื่อมต่อ...",
+        noLogs: "ไม่พบล็อกการเชื่อมต่อในช่วงเวลานี้"
+      },
+      table: {
+        timestamp: "เวลา (Timestamp)",
+        status: "สถานะ",
+        ipAddress: "ไอพีแอดเดรส",
+        logType: "ประเภทล็อก",
+        actions: "จัดการ",
+        rowsPerPage: "จำนวนแถวต่อหน้า",
+        of: "จาก"
+      }
+    }
+  },
+
+  sensorFlyout: {
+    EN: {
+      title: "Connection Log Details",
+      tabTable: "Table",
+      tabJson: "JSON",
+      searchPlaceholder: "Search fields or values...",
+      field: "Field",
+      value: "Value",
+      copyJson: "Copy JSON",
+      copied: "Copied!",
+      of: "of"
+    },
+    TH: {
+      title: "รายละเอียดล็อกการเชื่อมต่อ",
+      tabTable: "ตาราง",
+      tabJson: "JSON",
+      searchPlaceholder: "ค้นหาฟิลด์ หรือ ข้อมูล...",
+      field: "ฟิลด์ (Field)",
+      value: "ข้อมูล (Value)",
+      copyJson: "คัดลอก JSON",
+      copied: "คัดลอกแล้ว!",
+      of: "จาก"
+    }
   }
 };

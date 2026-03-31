@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, use, useMemo } from "react";
-import { Activity, Cpu, HardDrive, Wifi, Clock, Server, Eye, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { Activity, Cpu, HardDrive, Wifi, Clock, Server, Eye, ChevronLeft, ChevronRight, RefreshCw, ArrowLeft } from "lucide-react";
 import { format, subMinutes, subHours, subDays } from "date-fns";
+import { useRouter } from "next/navigation";
 import { 
   AdvancedTimeRangeSelector, 
   TimeRangeValue 
@@ -11,6 +12,9 @@ import { Navbar } from "@/src/components/layout/navbar";
 import { sensorStatsApi } from "@/src/modules/fleet/api/sensor-stats.api";
 import { SensorOverviewHistogram } from "@/src/components/ui/sensor-overview-histogram";
 import { SensorDetailFlyout } from "@/src/components/ui/sensor-detail-flyout";
+
+import { useLanguage } from "@/src/context/LanguageContext";
+import { agentTranslations } from "@/src/locales/agentdict";
 
 interface DiskStat {
   name: string;
@@ -36,6 +40,10 @@ interface SystemStats {
 export default function SensorOverviewPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const sensorId = resolvedParams.id; 
+  const router = useRouter(); 
+
+  const { language } = useLanguage();
+  const t = agentTranslations.sensorOverview[language as keyof typeof agentTranslations.sensorOverview] || agentTranslations.sensorOverview.EN;
   
   // --- States ---
   const [isLoading, setIsLoading] = useState(true);
@@ -148,7 +156,7 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
                 const used = Number(d.used_gb) || 0;
                 const total = Number(d.total_gb) || 1;
                 disks.push({
-                    name: d.device || d.mount_point || d.device_name || `Disk ${idx + 1}`,
+                    name: d.mount || d.device || d.mount_point || d.device_name || `Disk ${idx + 1}`,
                     used: Number(used.toFixed(1)),
                     total: Number(total.toFixed(1)),
                     percent: (used / total) * 100
@@ -241,14 +249,22 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
         
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#0B1120] p-5 rounded-xl border border-blue-900/30 shadow-lg">
           <div>
+            <button 
+              onClick={() => router.push("/fleet/sensor")}
+              className="group flex items-center gap-2 text-slate-400 hover:text-cyan-400 transition-colors mb-3 outline-none"
+            >
+              <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
+              <span className="text-sm font-bold uppercase tracking-wider">{t.back}</span>
+            </button>
+
             <h1 className="text-2xl font-bold text-white flex items-center gap-3">
               <Server className="w-6 h-6 text-cyan-400" />
-              Sensor Overview: <span className="text-cyan-400">{sensorId || "Unknown"}</span>
+              {t.title}: <span className="text-cyan-400">{sensorId || t.unknown}</span>
               <button 
                 onClick={fetchOverviewData} 
                 disabled={isLoading}
                 className="p-1.5 ml-2 rounded-lg bg-blue-900/30 hover:bg-blue-600/50 text-cyan-400 transition-colors border border-blue-900/50 group"
-                title="Refresh data"
+                title={t.refreshTooltip}
               >
                 <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin opacity-50' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
               </button>
@@ -260,7 +276,7 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
               </span>
               <span className="text-sm text-slate-400 flex items-center gap-1">
                 <Clock className="w-4 h-4" /> 
-                Last seen: <span className="text-slate-200 font-mono">{format(new Date(latestStats.lastSeen), "HH:mm:ss")}</span>
+                {t.lastSeen} <span className="text-slate-200 font-mono">{format(new Date(latestStats.lastSeen), "HH:mm:ss")}</span>
               </span>
             </div>
           </div>
@@ -280,7 +296,7 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
             <div className="flex justify-between items-start">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-500/10 rounded-lg"><Cpu className="w-5 h-5 text-blue-400" /></div>
-                <h3 className="text-sm font-bold text-white">CPU Usage</h3>
+                <h3 className="text-sm font-bold text-white">{t.cards.cpuUsage}</h3>
               </div>
               <span className="text-2xl font-bold font-mono text-white">{latestStats.cpu.toFixed(1)}%</span>
             </div>
@@ -288,7 +304,7 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
               <div className="w-full bg-slate-800 rounded-full h-1.5 mb-1">
                 <div className={`h-1.5 rounded-full ${latestStats.cpu > 80 ? 'bg-red-500' : 'bg-blue-500'} transition-all duration-1000`} style={{ width: `${Math.min(latestStats.cpu, 100)}%` }}></div>
               </div>
-              <div className="text-[10px] text-slate-500 text-right mt-1">Overall System CPU</div>
+              <div className="text-[10px] text-slate-500 text-right mt-1">{t.cards.overallCpu}</div>
             </div>
           </div>
 
@@ -296,13 +312,13 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
             <div className="flex justify-between items-start">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-purple-500/10 rounded-lg"><Activity className="w-5 h-5 text-purple-400" /></div>
-                <h3 className="text-sm font-bold text-white">Memory</h3>
+                <h3 className="text-sm font-bold text-white">{t.cards.memory}</h3>
               </div>
               <span className="text-2xl font-bold font-mono text-white">{latestStats.memory.percent.toFixed(1)}%</span>
             </div>
             <div className="mt-4">
               <div className="flex justify-between items-end mb-1">
-                 <span className="text-[10px] text-slate-400">Used Space</span>
+                 <span className="text-[10px] text-slate-400">{t.cards.usedSpace}</span>
                  <span className="text-[10px] text-slate-400 font-mono">{latestStats.memory.used} / {latestStats.memory.total} GB</span>
               </div>
               <div className="w-full bg-slate-800 rounded-full h-1.5 mb-1">
@@ -314,7 +330,7 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
           <div className="bg-[#0B1120] border border-blue-900/30 rounded-xl p-5 shadow-lg flex flex-col h-[150px]">
             <div className="flex items-center gap-3 mb-3">
               <div className="p-2 bg-amber-500/10 rounded-lg"><HardDrive className="w-5 h-5 text-amber-400" /></div>
-              <h3 className="text-sm font-bold text-white">Disk Usage</h3>
+              <h3 className="text-sm font-bold text-white">{t.cards.diskUsage}</h3>
             </div>
             <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
               {latestStats.disks.length > 0 ? (
@@ -332,7 +348,7 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
                   </div>
                 ))
               ) : (
-                <div className="text-xs text-slate-500 flex h-full items-center justify-center">No disk data</div>
+                <div className="text-xs text-slate-500 flex h-full items-center justify-center">{t.cards.noDiskData}</div>
               )}
             </div>
           </div>
@@ -340,7 +356,7 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
           <div className="bg-[#0B1120] border border-blue-900/30 rounded-xl p-5 shadow-lg flex flex-col h-[150px]">
             <div className="flex items-center gap-3 mb-3">
               <div className="p-2 bg-emerald-500/10 rounded-lg"><Wifi className="w-5 h-5 text-emerald-400" /></div>
-              <h3 className="text-sm font-bold text-white">Network Traffic</h3>
+              <h3 className="text-sm font-bold text-white">{t.cards.networkTraffic}</h3>
             </div>
             <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-2">
               {latestStats.networks.length > 0 ? (
@@ -354,7 +370,7 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
                   </div>
                 ))
               ) : (
-                <div className="text-xs text-slate-500 flex h-full items-center justify-center">No interface data</div>
+                <div className="text-xs text-slate-500 flex h-full items-center justify-center">{t.cards.noInterfaceData}</div>
               )}
             </div>
           </div>
@@ -363,13 +379,13 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
 
         <div className="bg-[#0B1120] border border-blue-900/30 rounded-xl shadow-lg flex flex-col overflow-hidden">
           <div className="p-5 border-b border-blue-900/30">
-            <h3 className="text-lg font-bold text-white">Connection History</h3>
+            <h3 className="text-lg font-bold text-white">{t.history.title}</h3>
           </div>
           
           <div className="p-5 h-[280px] flex flex-col">
             {isLoading ? (
               <div className="flex-1 flex items-center justify-center">
-                <div className="animate-pulse text-slate-500">Loading graph data...</div>
+                <div className="animate-pulse text-slate-500">{t.history.loadingGraph}</div>
               </div>
             ) : (
               <SensorOverviewHistogram data={chartData} interval={chartInterval} />
@@ -380,18 +396,18 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
             <table className="w-full text-left border-collapse min-w-[1000px]">
               <thead className="bg-[#020617] sticky top-0 z-10 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-blue-900/50 shadow-sm">
                 <tr>
-                  <th className="p-4 border-b border-blue-900/50 bg-[#020617]">Timestamp</th>
-                  <th className="p-4 border-b border-blue-900/50 bg-[#020617]">Status</th>
-                  <th className="p-4 border-b border-blue-900/50 bg-[#020617]">IP Address</th>
-                  <th className="p-4 border-b border-blue-900/50 bg-[#020617]">Log Type</th>
-                  <th className="p-4 border-b border-blue-900/50 bg-[#020617] text-center">Actions</th>
+                  <th className="p-4 border-b border-blue-900/50 bg-[#020617] font-bold text-[13px]">{t.table.timestamp}</th>
+                  <th className="p-4 border-b border-blue-900/50 bg-[#020617] font-bold text-[13px]">{t.table.status}</th>
+                  <th className="p-4 border-b border-blue-900/50 bg-[#020617] font-bold text-[13px]">{t.table.ipAddress}</th>
+                  <th className="p-4 border-b border-blue-900/50 bg-[#020617] font-bold text-[13px]">{t.table.logType}</th>
+                  <th className="p-4 border-b border-blue-900/50 bg-[#020617] font-bold text-[13px] text-center">{t.table.actions}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-blue-900/20">
                 {isLoading ? (
-                  <tr><td colSpan={5} className="p-10 text-center text-slate-500 animate-pulse">Fetching connection logs...</td></tr>
+                  <tr><td colSpan={5} className="p-10 text-center text-slate-500 animate-pulse">{t.history.fetchingLogs}</td></tr>
                 ) : currentLogs.length === 0 ? (
-                  <tr><td colSpan={5} className="p-10 text-center text-slate-500">No connection logs found for this time range.</td></tr>
+                  <tr><td colSpan={5} className="p-10 text-center text-slate-500">{t.history.noLogs}</td></tr>
                 ) : (
                   currentLogs.map((log, index) => {
                     const isSelected = selectedRowId === log.id;
@@ -404,13 +420,13 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
                           ${isSelected ? "bg-blue-900/20 border-l-4 border-l-cyan-400" : "hover:bg-blue-900/10 border-l-4 border-l-transparent"}
                         `}
                       >
-                        <td className={`p-4 font-mono ${isSelected ? 'text-slate-200' : 'text-slate-300'}`}>
+                        <td className={`p-4 font-bold text-[13px] ${isSelected ? 'text-slate-200' : 'text-slate-300'}`}>
                           {format(new Date(log.timestamp), "M/d/yyyy, h:mm:ss a")}
                         </td>
-                        <td className="p-4 font-bold text-emerald-400">{log.status}</td>
-                        <td className={`p-4 ${isSelected ? 'text-slate-200' : 'text-slate-300'}`}>{log.ip}</td>
-                        <td className={`p-4 font-mono text-[11px] ${isSelected ? 'text-slate-300' : 'text-slate-400'}`}>{log.logType}</td>
-                        <td className="p-4 text-center">
+                        <td className="p-4 font-bold text-[13px] text-emerald-400">{log.status}</td>
+                        <td className={`p-4 font-bold text-[13px] ${isSelected ? 'text-slate-200' : 'text-slate-300'}`}>{log.ip}</td>
+                        <td className={`p-4 font-bold text-[13px] ${isSelected ? 'text-slate-300' : 'text-slate-400'}`}>{log.logType}</td>
+                        <td className="p-4 text-center ">
                           <button 
                             onClick={(e) => {
                               e.stopPropagation();
@@ -420,7 +436,7 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
                               ${isSelected ? 'text-white bg-slate-800' : 'text-slate-400 hover:text-white hover:bg-slate-800'}
                             `}
                           >
-                              <Eye className="w-4 h-4" />
+                              <Eye className="w-5 h-5" />
                           </button>
                         </td>
                       </tr>
@@ -431,9 +447,10 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
             </table>
           </div>
 
+          {/* Footer paging */}
           <div className="flex-none flex items-center justify-between sm:justify-end px-6 py-4 border-t border-blue-900/50 bg-[#020617] z-20 gap-6">
               <div className="flex items-center gap-2 text-sm text-slate-400">
-                  <span>Rows per page</span> 
+                  <span>{t.table.rowsPerPage}</span> 
                   <select 
                     value={itemsPerPage} 
                     onChange={(e) => { setItemsPerPage(Number(e.target.value)); setPage(1); }} 
@@ -446,7 +463,7 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
                   </select>
               </div>
               <div className="flex items-center gap-4 text-xs text-slate-400 font-bold uppercase tracking-wider">
-                  <div>{startRow}-{endRow} of {totalLogs}</div> 
+                  <div>{startRow}-{endRow} {t.table.of} {totalLogs}</div> 
                   <div className="flex items-center gap-1">
                       <button 
                         onClick={() => setPage(p => Math.max(1, p - 1))} 
