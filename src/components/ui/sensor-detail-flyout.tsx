@@ -16,6 +16,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 
+import { useLanguage } from "@/src/context/LanguageContext";
+import { agentTranslations } from "@/src/locales/agentdict";
+
 const flattenObject = (obj: any, prefix = ""): Record<string, any> => {
   let items: Record<string, any> = {};
   if (!obj) return items;
@@ -56,6 +59,9 @@ export function SensorDetailFlyout({
   onNavigate,
   onClose,
 }: SensorDetailFlyoutProps) {
+  const { language } = useLanguage();
+  const t = agentTranslations.sensorFlyout[language as keyof typeof agentTranslations.sensorFlyout] || agentTranslations.sensorFlyout.EN;
+
   const [drawerTab, setDrawerTab] = useState<"table" | "json">("table");
   const [searchInput, setSearchInput] = useState("");
   const [filterText, setFilterText] = useState("");
@@ -193,7 +199,7 @@ export function SensorDetailFlyout({
       <div className="flex-none px-4 sm:px-6 py-4 border-b border-slate-800 bg-slate-950 flex items-center justify-between">
         <div className="flex items-center gap-2 sm:gap-4">
           <h3 className="text-xs sm:text-sm font-bold text-white uppercase tracking-widest opacity-80">
-            Connection Log Details
+            {t.title} 
           </h3>
           
           {logs.length > 0 && (
@@ -206,7 +212,7 @@ export function SensorDetailFlyout({
                 <ChevronLeft size={14} />
               </button>
               <span className="px-2 min-w-[50px] sm:min-w-[70px] text-center tracking-tight">
-                {currentIndex >= 0 ? `${currentIndex + 1} of ${logs.length}` : `0 of 0`}
+                {currentIndex >= 0 ? `${currentIndex + 1} ${t.of} ${logs.length}` : `0 ${t.of} 0`} {/* 🚀 ใช้คำแปล */}
               </span>
               <button
                 disabled={currentIndex >= logs.length - 1}
@@ -233,7 +239,7 @@ export function SensorDetailFlyout({
             drawerTab === "table" ? "text-blue-500 border-blue-500" : "text-slate-500 border-transparent hover:text-slate-300",
           )}
         >
-          <TableIcon size={14} /> Table View
+          <TableIcon size={14} /> {t.tabTable} {/* 🚀 ใช้คำแปล */}
         </button>
         <button
           onClick={() => setDrawerTab("json")}
@@ -242,7 +248,7 @@ export function SensorDetailFlyout({
             drawerTab === "json" ? "text-blue-500 border-blue-500" : "text-slate-500 border-transparent hover:text-slate-300",
           )}
         >
-          <FileJson size={14} /> JSON View
+          <FileJson size={14} /> {t.tabJson} {/* 🚀 ใช้คำแปล */}
         </button>
       </div>
 
@@ -254,7 +260,7 @@ export function SensorDetailFlyout({
                 <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
                 <input
                   className="w-full bg-slate-900 border border-slate-800 rounded-md py-1.5 pl-9 pr-3 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50"
-                  placeholder="Search fields or values..."
+                  placeholder={t.searchPlaceholder} /* 🚀 ใช้คำแปล */
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSearchSubmit()}
@@ -263,8 +269,8 @@ export function SensorDetailFlyout({
             </div>
 
             <div className="flex-none flex border-b border-slate-800 bg-slate-900/50 text-[10px] font-bold text-slate-500 uppercase tracking-widest select-none">
-              <div className="w-[45%] sm:w-[40%] px-4 py-2 border-r border-slate-800">Field</div>
-              <div className="w-[55%] sm:w-[60%] px-4 py-2">Value</div>
+              <div className="w-[45%] sm:w-[40%] px-4 py-2 border-r border-slate-800">{t.field}</div> {/* 🚀 ใช้คำแปล */}
+              <div className="w-[55%] sm:w-[60%] px-4 py-2">{t.value}</div> {/* 🚀 ใช้คำแปล */}
             </div>
 
             <div className="flex-1 overflow-auto custom-scrollbar pb-10">
@@ -298,7 +304,7 @@ export function SensorDetailFlyout({
                 className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-slate-400 hover:text-white bg-slate-800/50 px-3 py-1.5 rounded-md border border-slate-800 transition-all"
               >
                 {isCopied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
-                {isCopied ? "Copied!" : "Copy JSON"}
+                {isCopied ? t.copied : t.copyJson} {/* 🚀 ใช้คำแปล */}
               </button>
             </div>
             <div className="p-6 overflow-auto h-full custom-scrollbar bg-[#090b10]">
