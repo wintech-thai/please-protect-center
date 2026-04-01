@@ -10,9 +10,7 @@ export interface SensorOverviewPayload {
 export const sensorStatsApi = {
   getOverview: async (sensorId: string, payload: SensorOverviewPayload = {}) => {
     const indexName = "onix-v2-agent-stats-*";
-    
     const cleanSensorId = sensorId ? sensorId.trim() : "";
-    
     const queryMust: any[] = [
       { term: { "data.agent_id.keyword": cleanSensorId } }
     ];
