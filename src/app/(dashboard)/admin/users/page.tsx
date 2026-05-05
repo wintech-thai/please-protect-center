@@ -167,8 +167,7 @@ export default function UsersPage() {
       toast.dismiss("gen-link");
 
       if (response && response.forgotPasswordUrl) {
-        const appUrl = process.env.NEXT_PUBLIC_APP_DOMAIN || window.location.host;
-        const domain = appUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        const domain = window.location.host;
         const finalLink = response.forgotPasswordUrl.replace('<REGISTER_SERVICE_DOMAIN>', domain);
         
         setGeneratedLink(finalLink);
