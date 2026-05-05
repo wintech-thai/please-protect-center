@@ -190,10 +190,10 @@ export default function CreateUserPage() {
         let finalInviteLink = rawLink;
 
         if (rawLink) {
-          const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN || "https://center-dev.please-protect.com";
-          
+          const appDomain = window.location.origin;
+
           finalInviteLink = rawLink.replace(/https?:\/\/<REGISTER_SERVICE_DOMAIN>/, appDomain);
-          
+
           if (finalInviteLink === rawLink) {
              finalInviteLink = rawLink.replace("<REGISTER_SERVICE_DOMAIN>", appDomain.replace(/^https?:\/\//, ''));
           }

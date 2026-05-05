@@ -35,7 +35,6 @@ export default function UsersPage() {
   const { language } = useLanguage();
   const t = translations.users[language];
 
-  // States
   const [users, setUsers] = useState<UserItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -167,8 +166,7 @@ export default function UsersPage() {
       toast.dismiss("gen-link");
 
       if (response && response.forgotPasswordUrl) {
-        const appUrl = process.env.NEXT_PUBLIC_APP_DOMAIN || window.location.host;
-        const domain = appUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        const domain = window.location.host;
         const finalLink = response.forgotPasswordUrl.replace('<REGISTER_SERVICE_DOMAIN>', domain);
         
         setGeneratedLink(finalLink);
