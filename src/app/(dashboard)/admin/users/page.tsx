@@ -35,7 +35,6 @@ export default function UsersPage() {
   const { language } = useLanguage();
   const t = translations.users[language];
 
-  // States
   const [users, setUsers] = useState<UserItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
