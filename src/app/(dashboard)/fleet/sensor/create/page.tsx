@@ -105,7 +105,7 @@ export default function CreateSensorPage() {
         
         if (agentData) {
           const rawUrl = agentData.registrationUrl || "";
-          const apiDomain = window.location.origin.replace("web-dev", "api-dev");
+          const apiDomain = window.location.origin.replace("web-dev", "api-dev").replace("//web.", "//api.");
           const fixedUrl = rawUrl ? rawUrl.replace(/https?:\/\/[^/]+/, apiDomain) : "";
 
           setRegResult({
