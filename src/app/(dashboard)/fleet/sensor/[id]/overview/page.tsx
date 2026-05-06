@@ -10,6 +10,7 @@ import {
 } from "@/src/components/ui/advanced-time-selector";
 import { Navbar } from "@/src/components/layout/navbar"; 
 import { sensorStatsApi } from "@/src/modules/fleet/api/sensor-stats.api";
+import { agentApi } from "@/src/modules/fleet/api/agent.api";
 import { SensorOverviewHistogram } from "@/src/components/ui/sensor-overview-histogram";
 import { SensorDetailFlyout } from "@/src/components/ui/sensor-detail-flyout";
 
@@ -67,6 +68,8 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
     networks: [],    
     lastSeen: new Date().toISOString()
   });
+
+  const [sensorCode, setSensorCode] = useState<string>("");
 
   const [selectedLog, setSelectedLog] = useState<any | null>(null);
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
@@ -220,6 +223,18 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
     fetchOverviewData();
   }, [fetchOverviewData]);
 
+  useEffect(() => {
+    const fetchSensorCode = async () => {
+      try {
+        const orgId = localStorage.getItem("orgId") || "";
+        const res = await agentApi.getAgentById(orgId, sensorId);
+        const code = res?.agent?.code || "";
+        setSensorCode(code);
+      } catch {}
+    };
+    fetchSensorCode();
+  }, [sensorId]);
+
   const totalLogs = logs.length;
   const totalPages = Math.ceil(totalLogs / itemsPerPage);
   const startRow = totalLogs === 0 ? 0 : (page - 1) * itemsPerPage + 1;
@@ -259,7 +274,8 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
 
             <h1 className="text-2xl font-bold text-white flex items-center gap-3">
               <Server className="w-6 h-6 text-cyan-400" />
-              {t.title}: <span className="text-cyan-400">{sensorId || t.unknown}</span>
+              {t.title}: <span className="text-cyan-400">{sensorCode || t.unknown}</span>
+              {sensorCode && <span className="text-slate-500 text-base font-normal">({sensorId})</span>}
               <button 
                 onClick={fetchOverviewData} 
                 disabled={isLoading}
