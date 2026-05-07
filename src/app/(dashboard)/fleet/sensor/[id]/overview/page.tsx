@@ -121,13 +121,13 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
 
       const mappedLogs = hits.map((h: any) => {
         const source = h._source || {};
-        const req = source.data?.request || {};
+        const d = source.data || {};
         return {
           id: h._id,
-          timestamp: req.timestamp || source['@timestamp'],
+          timestamp: d.timestamp || source['@timestamp'],
           status: "Online",
-          ip: source.data?.host || req.interfaces?.interfaces?.[0]?.ip || "-",
-          logType: source.data?.AuditType || "Heartbeat",
+          ip: d.host || d.interfaces?.interfaces?.[0]?.ip || "-",
+          logType: d.LogType || "Heartbeat",
           latency: "-",
           rawDoc: source
         };
@@ -136,23 +136,23 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
 
       if (hits.length > 0) {
         const latestSource = hits[0]._source || {};
-        const req = latestSource.data?.request || {};
+        const d = latestSource.data || {};
 
-        const cpuPercent = req.cpu?.usage_percent || 0;
-        const memUsedMb = req.memory?.used_mb || 0;
-        const memTotalMb = req.memory?.total_mb || 1;
+        const cpuPercent = d.cpu?.usage_percent || 0;
+        const memUsedMb = d.memory?.used_mb || 0;
+        const memTotalMb = d.memory?.total_mb || 1;
 
         const memUsedGb = Number((memUsedMb / 1024).toFixed(1));
         const memTotalGb = Number((memTotalMb / 1024).toFixed(1));
         const memPercent = memTotalGb > 0 ? (memUsedGb / memTotalGb) * 100 : 0;
 
         const disks: DiskStat[] = [];
-        if (Array.isArray(req.disk)) {
-          req.disk.forEach((d: any, idx: number) => {
-            const used = Number(d.used_gb) || 0;
-            const total = Number(d.total_gb) || 1;
+        if (Array.isArray(d.disk)) {
+          d.disk.forEach((disk: any, idx: number) => {
+            const used = Number(disk.used_gb) || 0;
+            const total = Number(disk.total_gb) || 1;
             disks.push({
-              name: d.mount || d.filesystem || `Disk ${idx + 1}`,
+              name: disk.mount || disk.filesystem || `Disk ${idx + 1}`,
               used: Number(used.toFixed(1)),
               total: Number(total.toFixed(1)),
               percent: (used / total) * 100
@@ -161,7 +161,7 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
         }
 
         const networks: NetworkStat[] = [];
-        const ifaces = req.interfaces?.interfaces;
+        const ifaces = d.interfaces?.interfaces;
         if (Array.isArray(ifaces)) {
           ifaces.forEach((iface: any, idx: number) => {
             networks.push({
@@ -177,7 +177,7 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
           memory: { used: memUsedGb, total: memTotalGb, percent: memPercent },
           disks,
           networks,
-          lastSeen: req.timestamp || latestSource['@timestamp']
+          lastSeen: d.timestamp || latestSource['@timestamp']
         });
       }
 

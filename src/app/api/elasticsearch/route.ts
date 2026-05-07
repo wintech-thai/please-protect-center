@@ -19,6 +19,9 @@ export async function POST(request: Request) {
 
     const auth = Buffer.from(`${esUser}:${esPassword}`).toString("base64");
 
+    console.log("ES Request URL:", `${esUrl}/${index}/_search`);
+    console.log("ES Query:", JSON.stringify(query, null, 2));
+
     const response = await axios.post(`${esUrl}/${index}/_search`, query, {
       headers: {
         "Content-Type": "application/json",
