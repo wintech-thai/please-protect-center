@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import axios from "axios";
+import https from "https";
+
+const httpsAgent = new https.Agent({ rejectUnauthorized: false });
 
 export async function POST(request: Request) {
   try {
@@ -15,20 +19,21 @@ export async function POST(request: Request) {
 
     const auth = Buffer.from(`${esUser}:${esPassword}`).toString("base64");
 
-    const response = await fetch(`${esUrl}/${index}/_search`, {
-      method: "POST",
+    console.log("ES Request URL:", `${esUrl}/${index}/_search`);
+    console.log("ES Query:", JSON.stringify(query, null, 2));
+
+    const response = await axios.post(`${esUrl}/${index}/_search`, query, {
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Basic ${auth}`,
       },
-      body: JSON.stringify(query),
+      httpsAgent,
     });
 
-    const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
+    return NextResponse.json(response.data, { status: response.status });
 
   } catch (error: any) {
-    console.error("ES API Route Error:", error);
+    console.error("ES API Route Error:", error.message);
     return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
   }
 }

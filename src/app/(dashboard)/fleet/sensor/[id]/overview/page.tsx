@@ -10,6 +10,7 @@ import {
 } from "@/src/components/ui/advanced-time-selector";
 import { Navbar } from "@/src/components/layout/navbar"; 
 import { sensorStatsApi } from "@/src/modules/fleet/api/sensor-stats.api";
+import { agentApi } from "@/src/modules/fleet/api/agent.api";
 import { SensorOverviewHistogram } from "@/src/components/ui/sensor-overview-histogram";
 import { SensorDetailFlyout } from "@/src/components/ui/sensor-detail-flyout";
 
@@ -68,6 +69,8 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
     lastSeen: new Date().toISOString()
   });
 
+  const [sensorCode, setSensorCode] = useState<string>("");
+
   const [selectedLog, setSelectedLog] = useState<any | null>(null);
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
   const [showFlyout, setShowFlyout] = useState(false);
@@ -116,96 +119,65 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
       setChartInterval(interval);
       setPage(1);
 
-      const getField = (source: any, nestedPath: string, flatKey: string) => {
-          const parts = nestedPath.split('.');
-          let nestedVal = source;
-          for (const p of parts) { if (nestedVal) nestedVal = nestedVal[p]; else break; }
-          return (nestedVal !== undefined && nestedVal !== source) ? nestedVal : source[flatKey];
-      };
-
       const mappedLogs = hits.map((h: any) => {
         const source = h._source || {};
+        const d = source.data || {};
         return {
           id: h._id,
-          timestamp: getField(source, 'data.timestamp', 'data.timestamp') || source['@timestamp'],
-          status: "Online", 
-          ip: getField(source, 'data.host', 'data.host') || "-",
-          logType: getField(source, 'data.LogType', 'data.LogType') || "AgentStat",
-          latency: "-", 
-          rawDoc: source 
+          timestamp: d.timestamp || source['@timestamp'],
+          status: "Online",
+          ip: d.host || d.interfaces?.interfaces?.[0]?.ip || "-",
+          logType: d.LogType || "Heartbeat",
+          latency: "-",
+          rawDoc: source
         };
       });
       setLogs(mappedLogs);
 
       if (hits.length > 0) {
         const latestSource = hits[0]._source || {};
-        
-        const cpuPercent = getField(latestSource, 'data.cpu.usage_percent', 'data.cpu.usage_percent') || 0;
-        const memUsedMb = getField(latestSource, 'data.memory.used_mb', 'data.memory.used_mb') || 0;
-        const memTotalMb = getField(latestSource, 'data.memory.total_mb', 'data.memory.total_mb') || 1;
-        
+        const d = latestSource.data || {};
+
+        const cpuPercent = d.cpu?.usage_percent || 0;
+        const memUsedMb = d.memory?.used_mb || 0;
+        const memTotalMb = d.memory?.total_mb || 1;
+
         const memUsedGb = Number((memUsedMb / 1024).toFixed(1));
         const memTotalGb = Number((memTotalMb / 1024).toFixed(1));
         const memPercent = memTotalGb > 0 ? (memUsedGb / memTotalGb) * 100 : 0;
 
-        const sumArray = (val: any) => Array.isArray(val) ? val.reduce((a, b) => a + (Number(b) || 0), 0) : (Number(val) || 0);
-
         const disks: DiskStat[] = [];
-        if (latestSource.data?.disk && Array.isArray(latestSource.data.disk)) {
-            latestSource.data.disk.forEach((d: any, idx: number) => {
-                const used = Number(d.used_gb) || 0;
-                const total = Number(d.total_gb) || 1;
-                disks.push({
-                    name: d.mount || d.device || d.mount_point || d.device_name || `Disk ${idx + 1}`,
-                    used: Number(used.toFixed(1)),
-                    total: Number(total.toFixed(1)),
-                    percent: (used / total) * 100
-                });
+        if (Array.isArray(d.disk)) {
+          d.disk.forEach((disk: any, idx: number) => {
+            const used = Number(disk.used_gb) || 0;
+            const total = Number(disk.total_gb) || 1;
+            disks.push({
+              name: disk.mount || disk.filesystem || `Disk ${idx + 1}`,
+              used: Number(used.toFixed(1)),
+              total: Number(total.toFixed(1)),
+              percent: (used / total) * 100
             });
-        } else {
-            const usedRaw = sumArray(latestSource['data.disk.used_gb'] || latestSource.data?.disk?.used_gb || 0);
-            const totalRaw = sumArray(latestSource['data.disk.total_gb'] || latestSource.data?.disk?.total_gb || 0);
-            if (totalRaw > 0) {
-                disks.push({
-                    name: "Total Disk",
-                    used: Number(usedRaw.toFixed(1)),
-                    total: Number(totalRaw.toFixed(1)),
-                    percent: (usedRaw / totalRaw) * 100
-                });
-            }
+          });
         }
 
         const networks: NetworkStat[] = [];
-        if (latestSource.data?.interfaces?.interfaces && Array.isArray(latestSource.data.interfaces.interfaces)) {
-            latestSource.data.interfaces.interfaces.forEach((iface: any, idx: number) => {
-                networks.push({
-                    name: iface.name || `Interface ${idx + 1}`,
-                    rx: Number(((Number(iface.stats?.rx_bytes) || 0) / (1024 * 1024)).toFixed(2)),
-                    tx: Number(((Number(iface.stats?.tx_bytes) || 0) / (1024 * 1024)).toFixed(2))
-                });
+        const ifaces = d.interfaces?.interfaces;
+        if (Array.isArray(ifaces)) {
+          ifaces.forEach((iface: any, idx: number) => {
+            networks.push({
+              name: iface.name || `Interface ${idx + 1}`,
+              rx: Number(((Number(iface.stats?.rx_bytes) || 0) / (1024 * 1024)).toFixed(2)),
+              tx: Number(((Number(iface.stats?.tx_bytes) || 0) / (1024 * 1024)).toFixed(2))
             });
-        } else {
-             const rxRaw = sumArray(latestSource['data.interfaces.interfaces.stats.rx_bytes'] || latestSource.data?.interfaces?.interfaces?.stats?.rx_bytes || 0);
-             const txRaw = sumArray(latestSource['data.interfaces.interfaces.stats.tx_bytes'] || latestSource.data?.interfaces?.interfaces?.stats?.tx_bytes || 0);
-             if (rxRaw > 0 || txRaw > 0) {
-                 networks.push({
-                     name: "Total Traffic",
-                     rx: Number((rxRaw / (1024 * 1024)).toFixed(2)),
-                     tx: Number((txRaw / (1024 * 1024)).toFixed(2))
-                 });
-             }
+          });
         }
 
         setLatestStats({
           cpu: Number(cpuPercent),
-          memory: { 
-            used: memUsedGb, 
-            total: memTotalGb,
-            percent: memPercent
-          },
+          memory: { used: memUsedGb, total: memTotalGb, percent: memPercent },
           disks,
           networks,
-          lastSeen: getField(latestSource, 'data.timestamp', 'data.timestamp') || latestSource['@timestamp']
+          lastSeen: d.timestamp || latestSource['@timestamp']
         });
       }
 
@@ -219,6 +191,18 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
   useEffect(() => {
     fetchOverviewData();
   }, [fetchOverviewData]);
+
+  useEffect(() => {
+    const fetchSensorCode = async () => {
+      try {
+        const orgId = localStorage.getItem("orgId") || "";
+        const res = await agentApi.getAgentById(orgId, sensorId);
+        const code = res?.agent?.code || "";
+        setSensorCode(code);
+      } catch {}
+    };
+    fetchSensorCode();
+  }, [sensorId]);
 
   const totalLogs = logs.length;
   const totalPages = Math.ceil(totalLogs / itemsPerPage);
@@ -259,7 +243,8 @@ export default function SensorOverviewPage({ params }: { params: Promise<{ id: s
 
             <h1 className="text-2xl font-bold text-white flex items-center gap-3">
               <Server className="w-6 h-6 text-cyan-400" />
-              {t.title}: <span className="text-cyan-400">{sensorId || t.unknown}</span>
+              {t.title}: <span className="text-cyan-400">{sensorCode || t.unknown}</span>
+              {sensorCode && <span className="text-slate-500 text-base font-normal">({sensorId})</span>}
               <button 
                 onClick={fetchOverviewData} 
                 disabled={isLoading}
