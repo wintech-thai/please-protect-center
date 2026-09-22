@@ -28,7 +28,7 @@ jobs:
     - name: Prepare
       id: prep
       run: |
-        DOCKER_IMAGE=${{matrix.service}}
+        DOCKER_IMAGE=pjamenaja/${{matrix.service}}
         GCR_IMAGE=asia-southeast1-docker.pkg.dev/its-artifact-commons/please-protect/${{matrix.service}}
         VERSION=latest
         GIT_HASH=$(git rev-parse --short "$GITHUB_SHA")
