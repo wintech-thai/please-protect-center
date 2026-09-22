@@ -110,7 +110,7 @@ jobs:
         file: ${{ steps.prep.outputs.dockerFile }}
         push: true
         load: false
-        tags: ${{ steps.prep.outputs.version }}
+        tags: ${{ steps.prep.outputs.tags }}
         build-args: version=${{ steps.prep.outputs.version }}
 
     - name: Discord notification success
